@@ -43,8 +43,11 @@ int image_load(const char *filename, image_t *image) {
   if (ext && !strcasecmp(ext,".pnm")) {
     return image_load_pnm(filename,image);
   }
+  if (ext && !strcasecmp(ext,".ppm")) {
+    return image_load_pnm(filename,image);
+  }
   fprintf(stderr,"Unknown extension for read from: %s\n",ext ? ext : "(none)");
-  return -1;
+  return 3;
 }
 
 int image_save(const char *filename, const image_t *image) {
@@ -60,5 +63,5 @@ int image_save(const char *filename, const image_t *image) {
     return image_save_pnm(filename,image);
   }
   fprintf(stderr,"Unknown extension to write to: %s\n",ext ? ext : "(none)");
-  return -1;
+  return 3;
 }

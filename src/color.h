@@ -5,16 +5,7 @@
 
 #include "image/image.h"
 
-#ifndef MIN
-#define MIN(a,b) (((a)<(b)) ? (a) : (b))
-#endif
 
-#ifndef MAX
-#define MAX(a,b) (((a)>(b)) ? (a) : (b))
-#endif
-
-#define STRETCH(x) ((x)*COLOR_STRETCH+(COLOR_STRETCH/2))
-#define UNSTRETCH(x) (((x)/COLOR_STRETCH))
 
 #define COLOR_DIST(x,y) (abs(UNSTRETCH((x))-UNSTRETCH((y))))
 
@@ -25,9 +16,19 @@ void static inline pixel_rgb2yiq(pixel_t *p) {
   int y = ((r + b) / 2 + g) / 2;
   int i = r - b + 255;
   int q = (r + b) / 2 - g + 255;
+
+  // echte YIQ: y = 0.299*r + 0.587*g + 0.114*b
+  //            i = 0.595716*r - 0.274453*g -0.321263*b
+  //            q = 0.211456*r - 0.522591*g +0.311135*b
+
+  // benadering: y = 0.25*r + 0.5*g + 0.25*b
+  //             i = 1 * r          - 1 * b
+  //             q = 0.5*r  - 1*g   + 0.5*b
+
   p->d[0] = STRETCH(y);
   p->d[1] = STRETCH(i);
   p->d[2] = STRETCH(q);
+  
 }
 
 void static inline pixel_yiq2rgb(pixel_t *p) {
@@ -43,9 +44,11 @@ void static inline pixel_yiq2rgb(pixel_t *p) {
   if (r > 255) r = 255;
   if (g > 255) g = 255;
   if (b > 255) b = 255;
+
   p->d[0] = r;
   p->d[1] = g;
   p->d[2] = b;
+ 
 }
 
 void static inline get_range_y(int *min, int *max, int *range_min, int *range_max) {
@@ -73,8 +76,10 @@ void static inline get_range_i(int y, int *min, int *max, int *range_min, int *r
     *min=0;
     *max=510;
   }
-  if (range_min[1] > *min) *min=range_min[1];
-  if (range_max[1] < *max) *max=range_max[1];
+  if (range_min[1] >= *min) *min=range_min[1];
+  if (range_max[1] <= *max) *max=range_max[1];
+  if (range_min[1] >= *max) *max=range_min[1];
+  if (range_max[1] <= *min) *min=range_max[1];
   *min=STRETCH(*min);
   *max=STRETCH(*max);
   assert(*min <= *max);
@@ -104,8 +109,10 @@ void static inline get_range_q(int y, int i, int *min, int *max, int *range_min,
     *min=MAX(1+(y-128)*2,128-(y-63)*2+(abs(i-255)/2)*2);
     *max=MIN(382+(y-63)*2,383+(191-y)*2-((1+abs(i-255))/2)*2);
   }
-  if (range_min[2] > *min) *min=range_min[2];
-  if (range_max[2] < *max) *max=range_max[2];
+  if (range_min[2] >= *min) *min=range_min[2];
+  if (range_max[2] <= *max) *max=range_max[2];
+  if (range_min[2] >= *max) *max=range_min[2];
+  if (range_max[2] <= *min) *min=range_max[2];
   *min=STRETCH(*min);
   *max=STRETCH(*max);
   assert(*min <= *max);

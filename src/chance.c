@@ -171,7 +171,7 @@ void chs_table_init(chs_table_t *tbl, int cutoff) {
   init_factors();
   for (int i=0; i<MULTISCALE_LEVELS; i++) {
     build_table(tbl->next[i][0],tbl->next[i][1],4096,alphas[i],4096-cutoff);
-    tbl->count[i]=0;
+//    tbl->count[i]=0;
   }
 #else
   build_table(tbl->next[0],tbl->next[1],4096,214748365,4096-cutoff);
@@ -180,13 +180,13 @@ void chs_table_init(chs_table_t *tbl, int cutoff) {
 
 void chs_show_stats(FILE *f, chs_table_t *tbl) {
 #if (MULTISCALE_CHANCES == 1)
-
+/*
   for (int i=0; i<MULTISCALE_LEVELS; i++) {
     uint32_t alpha=alphas[i];
     double tau=-1.0/log(1.0-alpha/4294967296.0);
     fprintf(f,"chs[%.2f] = %i\n",tau,tbl->count[i]);
   }
   output_factors(tbl);
-
+*/
 #endif
 }

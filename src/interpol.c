@@ -44,8 +44,47 @@ void static linear_w(int f, pixel_t *out, image_t *img, int x, int y, int x1, in
   pixel_linear_w(f,out,image_pixel(img,x1,y1),(x-x1)+(y-y1),image_pixel(img,x2,y2),(x2-x)+(y2-y),mask);
 }
 
+void gradient(pixel_t *out, image_t *img, int x, int y, int x1, int x2, int y1, int y2, int mask) {
+   pixel_t *top, *left;
 
-void interpolate_recurse(image_t *img, int x1, int x2, int y1, int y2, int mask, int hastop, int hasright, int hasbottom, int hasleft) {
+   top=image_pixel(img,x ,y1);
+   if (y1==0) { pixel_linear(top,image_pixel(img,x1,y1),x - x1,image_pixel(img,x2,y1),x2 - x,mask); }
+   if (y==y1) {out = top; return;}
+
+   left=image_pixel(img,x1 ,y);
+   if (x1==0) { pixel_linear(left,image_pixel(img,x1,y1),y - y1,image_pixel(img,x1,y2),y2 - y,mask); }
+   if (x==x1) {out = left; return;}
+
+   if (y==y2) {
+        wpixel_t p={};
+        wpixel_add(&p,image_pixel(img,x1,y1),-1,mask);
+        wpixel_add(&p,image_pixel(img,x2,y1),-1,mask);
+        wpixel_add(&p,image_pixel(img,x1,y2), 1,mask);
+        wpixel_add(&p,image_pixel(img,x2,y2), 1,mask);
+        wpixel_add(&p,top, 2,mask);
+        wpixel_div(&p,2,mask);
+        wpixel_clamp(&p,image_pixel(img,x1,y2),image_pixel(img,x2,y2),mask);
+        wpixel_set(out,&p,mask);
+        return;
+  } else if (x==x2) {
+        wpixel_t p={};
+        wpixel_add(&p,image_pixel(img,x1,y1),-1,mask);
+        wpixel_add(&p,image_pixel(img,x2,y1), 1,mask);
+        wpixel_add(&p,image_pixel(img,x1,y2),-1,mask);
+        wpixel_add(&p,image_pixel(img,x2,y2), 1,mask);
+        wpixel_add(&p,left, 2,mask);
+        wpixel_div(&p,2,mask);
+        wpixel_clamp(&p,image_pixel(img,x2,y1),image_pixel(img,x2,y2),mask);
+        wpixel_set(out,&p,mask);        
+        return;
+  }
+  fprintf(stderr,"Should not happen.\n");
+
+}
+
+
+
+void interpolate_recurse(image_t *img, const int x1, const int x2, const int y1, const int y2, const int mask, const int hastop, const int hasright, const int hasbottom, const int hasleft, const colors *colors) {
 //  return;
   int px1 = x1 - hasleft;
   int py1 = y1 - hastop;
@@ -62,21 +101,94 @@ void interpolate_recurse(image_t *img, int x1, int x2, int y1, int y2, int mask,
   assert(x1 <= x2 && y1 <= y2);
   if (px2 - px1 > py2 - py1) {
     int xm = (x1 + x2) / 2;
+    if (!hastop) { linear(image_pixel(img,xm,y1),img,xm,y1,px1,px2,py1,py1,mask); }
+//                   if (mask==0) round_color(colors,image_pixel(img,xm,y1)); }
+    if (!hasbottom) { linear(image_pixel(img,xm,y2),img,xm,y2,px1,px2,py2,py2,mask); }
+//                      if (mask==0) round_color(colors,image_pixel(img,xm,y2)); }
+    interpolate_recurse(img,x1  ,xm,y1,y2,mask,hastop,0,hasbottom,hasleft,colors);     // left
+    interpolate_recurse(img,xm+1,x2,y1,y2,mask,hastop,hasright,hasbottom,1,colors);    // right
+  } else {
+    int ym = (y1 + y2) / 2;
+    if (!hasleft) { linear(image_pixel(img,x1,ym),img,x1,ym,px1,px1,py1,py2,mask);    }
+//                    if (mask==0) round_color(colors,image_pixel(img,x1,ym)); }
+    if (!hasright) { linear(image_pixel(img,x2,ym),img,x2,ym,px2,px2,py1,py2,mask);    }
+//                     if (mask==0) round_color(colors,image_pixel(img,x2,ym)); }
+    interpolate_recurse(img,x1,x2,y1  ,ym,mask,hastop,hasright,0,hasleft,colors);      // top
+    interpolate_recurse(img,x1,x2,ym+1,y2,mask,1,hasright,hasbottom,hasleft,colors);   // bottom
+  }
+
+}
+
+void round_interpolated_colors(image_t *img, const int x1, const int x2, const int y1, const int y2, const int mask, const int hastop, const int hasright, const int hasbottom, const int hasleft, const colors *colors) {
+  int px1 = x1 - hasleft;
+  int py1 = y1 - hastop;
+  int px2 = x2 + hasright;
+  int py2 = y2 + hasbottom;
+  for (int y = y1; y <= y2 ; y++) {
+     for (int x = x1; x <= x2 ; x++) {
+        if (!((x == px1 && y==py1) || (x == px2 && y==py1) || (x == px1 && y==py2) || (x==px2 && y==py2))) {
+          round_color(colors,image_pixel(img,x,y));
+        }
+     }
+  }
+}
+
+void interpolate_recurse_a(image_t *img, int x1, int x2, int y1, int y2, int mask, int hastop, int hasright, int hasbottom, int hasleft) {
+  int px1 = x1 - hasleft;
+  int py1 = y1 - hastop;
+  int px2 = x2 + hasright;
+  int py2 = y2 + hasbottom;
+
+  if (px2 - px1 <= 1 && py2 - py1 <= 1) return;
+  if (x1 == x2+1 || y1 == y2+1) return;
+  assert(x1 <= x2 && y1 <= y2);
+
+  if (px2 - px1 >= py2 - py1) {
+    int xm = (x1 + x2) / 2;
     if (!hastop)    linear(image_pixel(img,xm,y1),img,xm,y1,px1,px2,py1,py1,mask);
     if (!hasbottom) linear(image_pixel(img,xm,y2),img,xm,y2,px1,px2,py2,py2,mask);
-    
-    interpolate_recurse(img,x1  ,xm,y1,y2,mask,hastop,0,hasbottom,hasleft);     // left
-    interpolate_recurse(img,xm+1,x2,y1,y2,mask,hastop,hasright,hasbottom,1);    // right
+    interpolate_recurse_a(img,x1  ,xm,y1,y2,mask,hastop,0,hasbottom,hasleft);     // left
+    interpolate_recurse_a(img,xm+1,x2,y1,y2,mask,hastop,hasright,hasbottom,1);    // right
   } else {
     int ym = (y1 + y2) / 2;
     if (!hasleft)  linear(image_pixel(img,x1,ym),img,x1,ym,px1,px1,py1,py2,mask);
     if (!hasright) linear(image_pixel(img,x2,ym),img,x2,ym,px2,px2,py1,py2,mask);
-    interpolate_recurse(img,x1,x2,y1  ,ym,mask,hastop,hasright,0,hasleft);      // top
-    interpolate_recurse(img,x1,x2,ym+1,y2,mask,1,hasright,hasbottom,hasleft);   // bottom
+    interpolate_recurse_a(img,x1,x2,y1  ,ym,mask,hastop,hasright,0,hasleft);      // top
+    interpolate_recurse_a(img,x1,x2,ym+1,y2,mask,1,hasright,hasbottom,hasleft);   // bottom
   }
-  
+
 }
 
+
+void interpolate_inv_dist(image_t *img, int x1, int x2, int y1, int y2, int mask, int hastop, int hasright, int hasbottom, int hasleft) {
+
+  if (x2-x1 > 4 || y2-y1 > 4) {
+    interpolate_recurse(img, x1, x2, y1, y2, mask, hastop, hasright, hasbottom, hasleft,NULL);
+    return;
+  }
+
+  int px1 = x1 - hasleft;
+  int py1 = y1 - hastop;
+  int px2 = x2 + hasright;
+  int py2 = y2 + hasbottom;
+  int wx1 = px1 - 0*2;
+  int wx2 = px2 + 0*1;
+  int wy1 = py1 - 0*2;
+  int wy2 = py2 + 0*1;
+  if (wx1 < 0) wx1 = 0;
+  if (wy1 < 0) wy1 = 0;
+  if (wx2 >= img->w) wx2 = img->w - 1;
+  if (wy2 >= img->h) wy2 = img->h - 1;
+
+//  fprintf(stderr,"Interpolating an area of %ix%i pixels (left top corner at %i,%i)\n",x2-x1,y2-y1,y1,x1);
+
+  for (int y = y1; y <= y2 ; y++) {
+     for (int x = x1; x <= x2 ; x++) {
+
+        inv_dist_onepixel(image_pixel(img,x,y),img,x,y,px1,px2,py1,py2,x1,x2,y1,y2,wx1,wx2,wy1,wy2,mask);
+     }
+  }
+}
 
 
 void static quadratic(pixel_t *out, image_t *img, int x, int y, int x0, int x1, int x2, int y0, int y1, int y2, int mask) {
@@ -829,8 +941,10 @@ void interpolate_nn(image_t *img, int x1, int x2, int y1, int y2, int mask) {
 }
 
 static const char *interpolation_names_array[] = {
-  "BiliBary",
-  "Diffuse",
+//  "BiliBary",
+  "Inverse Distance",
+//  "Diffuse",
+  "Recursive Bilinear (new)",
   "Recursive Bilinear",
   "Clipart (corners)",
   "Clipart (nearest known)",
@@ -847,18 +961,21 @@ static const char *interpolation_names_array[] = {
 
 const char **interpolation_name = interpolation_names_array;
 
-void interpolation(int type, image_t *img, int x1, int x2, int y1, int y2, int mask, int hastop, int hasright, int hasbottom, int hasleft) {
+void interpolation(int type, image_t *img, int x1, int x2, int y1, int y2, int mask, int hastop, int hasright, int hasbottom, int hasleft, colors *colors) {
   switch (type) {
         case 0: {
-                interpolate_bilibary(img, x1, x2, y1, y2, mask);
+//                interpolate_bilibary(img, x1, x2, y1, y2, mask);
+                interpolate_inv_dist(img, x1, x2, y1, y2, mask, hastop, hasright, hasbottom, hasleft);
                 return;
                 }
         case 1: {
-                interpolate_diffuse(img, x1, x2, y1, y2, mask);
+//                interpolate_diffuse(img, x1, x2, y1, y2, mask);
+                interpolate_recurse_a(img, x1, x2, y1, y2, mask, hastop, hasright, hasbottom, hasleft);
                 return;
                 }
         case 2: {
-                interpolate_recurse(img, x1, x2, y1, y2, mask, hastop, hasright, hasbottom, hasleft);
+                interpolate_recurse(img, x1, x2, y1, y2, mask, hastop, hasright, hasbottom, hasleft, colors);
+                if (mask==0) round_interpolated_colors(img, x1, x2, y1, y2, mask, hastop, hasright, hasbottom, hasleft, colors);
                 return;
                 }
         case 3: {

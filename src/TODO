@@ -1,0 +1,72 @@
+       ___ __      ____       
+        /  / \  '  /        |  JPiF 0.1   [May 2011]
+       /  /__/ /  /-        |  by Jon Sneyers & Pieter Wuille
+   \__/  /    /  /          |  (c) 2010-2011;  GNU GPL.
+____________________________________________________________________
+
+
+
+ TODO:
+ =====
+
+ * Andere kleurconfiguraties (YUV, greyscale, RGBA, 16-bit)
+ * auto-indexing heuristic laten rekening houden met verwachte grootte afbeelding (#pixels, compressieniveau)
+ * snelheid verbeteren
+ * optie voor extra snelheid ten koste van compressie 
+        - geen dure context properties berekenen
+        - minder multi_scale_levels
+        - kleinere context tree met vooral limited depth
+        - geen auto-indexing
+ * Video?
+ * Subsampling
+ * Breadth-first
+ * accurate fraction encoder optimaliseren
+ * Meta-sectie?
+   * EXIF tags includen?
+   * Comments
+   * Zlib gecomprimeerd, Rac gecomprimeerd, ongecomprimeerd?
+ * Betere header?
+   * Afbeeldingsgrootte
+   * Kleurschema (YIQ/YUV/RGB)
+   * Subsampling
+   * Kleurdiepte van kanalen
+   * Interpolatie-algoritme
+   * Predictie-algoritme
+   * Aanwezigheid van CRC, of CRC zelf al
+   * Grootte van RAC chunk (nu is het gewoon 'tot einde van file')
+   * Uitbreidbaarheid in gedachte houden...
+ * Naam verzinnen voor dit formaat
+   Huidige werknaam: JPIF (Jon & Pieter's Image Format)
+   -> "RRS" ?  (Recursive Rectangle Splitting)
+   -> "RRR" ?  (Recursive Rectangles with Range encoding)
+   -> "SIR" ?  (Split, Interpolate, Recurse)
+   -> "SIRF" ? (Splitting, Interpolating, Recursing Format)
+   -> "SIRI" ? (Split, Improve, Recurse, Interpolate)
+   -> "RIF" ?  (Recursively Interpolating Format)
+   -> "RIS" ?  (Recurisve Image Subdivision)
+   -> "JPEG ?  (Jon & Pieter's Encoding of Graphics)
+   -> "SWF" ?  (Sneyers-Wuille Format)
+
+
+ DONE:
+ =====
+
+ * Asymmetrische splits / smalle splits
+        (niet via extra splitbits maar door automatische heuristiek die ook at decode-time wordt gebruikt)
+ * Encoden in twee fases:
+        - eerst beste interpolaties zoeken (encoden met alle mogelijke interpolaties en counts bijhouden)
+        - dan "echt" encoderen waarbij interpolatie-methoden die minder dan X % gebruikt worden weggelaten worden
+        - lijst van methodes in file header (volgorde belangrijk!)
+     (was geimplementeerd maar is terug kapot, moet eens herbekeken worden, was te duur)
+ * Estimator verbeteren (mediaan?)
+        (inv-dist guess zit erin, is niet echt beter)
+ * Area-distance functie
+ * Twee fase encodering: eerst context tree maken, dan context tree uitschrijven en opnieuw encoderen met die tree
+        (dan kan tree learning in de tweede fase afgezet worden en wordt decoden een grote constante factor sneller)
+        (geeft minder goede compressie)
+ * pixel-positie (x,y) als context property?  (geen goed idee)
+ * auto-indexing
+ * twee-fasen encoding verbeteren (counts bijhouden en eerste fase-gedrag nabootsen ipv onmiddellijk naar leaf nodes)
+ * beslissen welke range encoder (16-bit, 24-bit, 40-bit of 56-bit)
+        (maakt weinig uit, dus 16-bit is ok)
+

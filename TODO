@@ -1,7 +1,0 @@
-
-
-
-- Dynamic contexts:
-        initialially, very rough quantization (only 1 or two levels per property)
-        split context if it has been used more than N times, use median (too expensive?) or avg
-        --> build decision tree

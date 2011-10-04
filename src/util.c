@@ -1,8 +1,6 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <math.h>
 #include <assert.h>
+#include <math.h>
 
 #include "config.h"
 
@@ -45,26 +43,37 @@ int ilog2(uint32_t l) {
   return p;
 }
 
-int quantize_log(int val, int maxval, int sign, int levels) {
-  if (levels==1 || val==0) return 0;
-  int rlevels=(sign ? (levels-1)/2 : levels-1);
-  int pre=(log4k[abs(4096/val)]*rlevels)/(log4k[4096/maxval-1]);
-  int result = 1+pre;
-  if (sign) {
-    return 1+pre*2+(val<0);
-  } else {
-//    fprintf(stderr,"val:%i, maxval:%i, levels:%i, pre:%i\n",val,maxval,levels,pre);
-    if (result >= levels) result=levels-1;
-    assert(result < levels);
-    assert(result > 0);
-    return result;
+
+int quantize_log_uint32(uint32_t val, int levels) {
+  if (val==0 || levels==1) return 0;
+  int result=32;
+//  fprintf(stderr,"%i",val);
+  while (val < (1UL<<31)) {
+    val *= 2;
+    result--;
   }
+  val = val >> 22;
+  assert(val >= 0);
+  assert(val < 1024);
+
+//  fprintf(stderr," : exp=%i rem=%i ",result,val);
+  
+  result *= 10;
+  
+  result += (int)(log2_tab[val]);
+//  fprintf(stderr," gives %i/%i\n",result,levels);
+
+  assert(result < levels);
+  assert(result > 0);
+  return result;
 }
 
+/*
 int quantize_log_uint32(uint32_t val, int levels) {
   if (val==0 || levels==1) return 0;
   levels--;
   int add=0;
+  fprintf(stderr,"%i",val);
   while (val < (1UL<<31)) {
     val *= 2;
     add++;
@@ -76,11 +85,58 @@ int quantize_log_uint32(uint32_t val, int levels) {
   if (result >= levels+1) result=levels;
   assert(result < levels+1);
   assert(result > 0);
+  fprintf(stderr," gives %i/%i\n",result,levels);
   return result;
 }
+  */
+
 int qbvar(uint32_t var, int quant) {
-    int result=quantize_log_uint32(2*var+10,quant+4)-4;
+    int result=quantize_log_uint32(var,quant);
     if (result<0) result=0;
     return result;
 }
 
+#define swap(a,b) {int _c=(a); (a)=(b); (b)=_c; }
+
+int median_3(int a, int b, int c) {
+  if (a<b) swap(a,b); 
+  if (b<c) swap(b,c); 
+  if (a<b) swap(a,b); 
+  return b;
+}
+
+int median5(int a, int b, int c, int d, int e) {
+  if (a<b) swap(a,b); // 1
+  if (c<d) swap(c,d); // 2
+  if (a<c) {swap(a,c); swap(b,d);} // 3
+  if (c>e) { // 4
+    if (d<e) swap(d,e); // 5
+    if (b>d) { // 6
+      if (b>c) return c; else return b; // 7
+    } else {
+      return d; // 6
+    } 
+  } else {
+    if (b>c) { // 5
+      if (e>c) { // 6
+        if (e>b) return b; else return e; // 7
+      } else {
+        return c; // 6
+      }
+    } else {
+      return c; // 5
+    }
+  }
+}
+
+int median7(int a, int b, int c, int d, int e, int f, int g) {
+  for(int i=0; i<6; i++) {
+    if (a<b) swap(a,b); 
+    if (b<c) swap(b,c); 
+    if (c<d) swap(c,d); 
+    if (d<e) swap(d,e); 
+    if (e<f) swap(e,f); 
+    if (f<g) swap(f,g); 
+  }
+  return d;
+}
