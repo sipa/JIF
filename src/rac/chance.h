@@ -32,7 +32,7 @@ public:
     return chance*16+8;
   }
 
-  uint16_t inline put(bool bit) {
+  void inline put(bool bit) {
     chance = sbcTable.next[bit][chance];
   }
 };

@@ -78,7 +78,7 @@ template <typename SymbolCoder> int read_int(SymbolCoder& coder, int min, int ma
     if (sign && !range_test(1<<(i+1),max)) break;
     if (!sign && !range_test(min,-(1<<(i+1)))) break;
     // if exponent i is possible, output the exponent bit
-    if (sign && range_test(1<<i,1<<(i+1)-1) || !sign && !range_test(1-(1<<(i+1)),-(1<<i))) {
+    if ((sign && range_test(1<<i,(1<<(i+1))-1)) || (!sign && !range_test(1-(1<<(i+1)),-(1<<i)))) {
       if (coder.readExp(i)) break;
     }
     i++;
@@ -121,11 +121,16 @@ template <typename SymbolCoder> void write_int(SymbolCoder& coder, int min, int 
     if (value) { // value is nonzero
       // only output zero bit if value could also have been zero
       if (max >= 0 && min <= 0 && range_test(0,0)) coder.writeZero(false);
-      bool sign = (value > 0 ? true : false);
-      // only output sign bit if value can be both pos and neg
-      if (max > 0 && min < 0 && range_test(min,-1) && range_test(1,max)) coder.writeSign(sign);
-      if (sign && min <= 0) min = 1;
-      if (!sign && max >= 0) max = -1;
+      int sign = (value > 0 ? 1 : -1);
+      int amin = 1;
+      if (max > 0 && min < 0) {
+        // only output sign bit if value can be both pos and neg
+        if (range_test(min,-1) && range_test(1,max)) coder.writeSign(sign);
+      } else {
+        amin = 
+      int amin = 
+      if (sign > 0 && min <= 0) min = 1;
+      if (sign < 0 && max >= 0) max = -1;
       const unsigned int a = abs(value);
       const unsigned int e = ilog2(a);
       unsigned int emin = ilog2((sign ? abs(min) : abs(max)));
@@ -146,6 +151,7 @@ template <typename SymbolCoder> void write_int(SymbolCoder& coder, int min, int 
       int left = (1 << e)-1;
       for (unsigned int pos = e; pos>0;) {
         int bit = 1;
+        int minabs = have, maxabs = have+left;
         int minval = (sign ? have : -(have+left));
         int maxval = (sign ? have+left : -have);
         if (min > minval) minval = min;
