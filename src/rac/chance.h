@@ -1,39 +1,40 @@
-class BitChance {
+#ifndef _RAC_CHANCE_H_
+#define _RAC_CHANCE_H_ 1
+
+#include <stdint.h>
+
+void extern build_table(uint16_t *zero_state, uint16_t *one_state, size_t size, int factor, int max_p);
+
+class SimpleBitChanceTable {
+  friend SimpleBitChance;
+private:
+  int cutoff;
+  uint16_t next[2][4096];
+public:
+  SimpleBitChanceTable(int cut) : cutoff(cut) { 
+    build_table(next[0], next[1], 4096, 214748365, 4096-cut);
+  }
+}
+
+extern SimpleBitChanceTable sbcTable;
+
+class SimpleBitChance {
+protected:
   uint16_t chance;
-}
 
-class BitWriter {
-  RacOutput* output;
-  BitChance chance;
-  
-  BitWriter operator<<(bool data) {
+public:
+  SimpleBitChance(int chanceIn = 0x8000) {
+    chance = chanceIn;
   }
-}
 
-class SymbolChance {
-  BitChance sign[9];
-  BitChance expo[8];
-  BitChance mant[9];
-  BitChance zero;
-}
+  int inline get() {
+    return chance;
+  }
 
-class SymbolWriter {
-  RacOutput* output;
-  SymbolChance chance;
-
-  SymbolWriter operator<<(int data) {
+  int inline put(bool bit, table_t& table) {
+    chance = sbcTable.next[bit][chance];
   }
 }
 
 
-/* example:
-
-  FILE* file = fopen("data.dat","w");
-  RacOutput rac(file);
-  
-  SymbolWriter pixDiff[3] = { SymbolWriter(rac), SymbolWriter(rac), SymbolWriter(rac) };
-
-  pixDiff[0] << pix1R << pix2R << pix3R;
-  pixDiff[1] << pix1G << pix2G << pix3G;
-
-*/
+#endif
