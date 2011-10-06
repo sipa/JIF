@@ -50,6 +50,12 @@ int default_range_test(int a, int b) {
   return (b-a+1);
 }
 
+static inline int signed_test(int(*range_test)(int,int), int low, int high, int sign) {
+  if (low > high) return 0;
+  if (sign > 0) return range_test(low, high);
+  return range_test(-high, -low);
+}
+
 template <typename SymbolCoder> int read_int(SymbolCoder& coder, int min, int max, int(*range_test)(int, int)) {
   assert(min<=max);
   assert(range_test(min,max));
@@ -57,15 +63,15 @@ template <typename SymbolCoder> int read_int(SymbolCoder& coder, int min, int ma
   if (min == max) return min; // nodig?
 
   if (max >= 0 && min <= 0 && range_test(0,0)) {
-    if (!range_test(min,-1) && !range_test(1,max)) return 0;
+    if (!signed_test(range_test,min,-1,1) && !signed_test(range_test,1,max,1)) return 0;
     if (coder.readZero()) return 0;
   }
 
   bool sign = true;
-  if (max > 0 && min < 0 && range_test(min,-1) && range_test(1,max)) {
+  if (max > 0 && min < 0 && signed_test(range_test,min,-1,1) && signed_test(range_test,1,max,1)) {
     sign = coder.readSign();
   } else {
-    if (min < 0 || !range_test(1,max)) sign = false;
+    if (min < 0 || !signed_test(range_test,1,max,1)) sign = false;
   }
   if (sign && min <= 0) min = 1;
   if (!sign && max >= 0) max = -1;
@@ -75,10 +81,10 @@ template <typename SymbolCoder> int read_int(SymbolCoder& coder, int min, int ma
   unsigned int i = emin;
   while (i < emax) {
     // if exponent >i is impossible, we are done
-    if (sign && !range_test(1<<(i+1),max)) break;
-    if (!sign && !range_test(min,-(1<<(i+1)))) break;
+    if (sign && !signed_test(range_test,1<<(i+1),max,1)) break;
+    if (!sign && !signed_test(range_test,min,-(1<<(i+1)),1)) break;
     // if exponent i is possible, output the exponent bit
-    if ((sign && range_test(1<<i,(1<<(i+1))-1)) || (!sign && !range_test(1-(1<<(i+1)),-(1<<i)))) {
+    if ((sign && signed_test(range_test,1<<i,(1<<(i+1))-1,1)) || (!sign && !signed_test(range_test,1-(1<<(i+1)),-(1<<i),1))) {
       if (coder.readExp(i)) break;
     }
     i++;
@@ -98,9 +104,9 @@ template <typename SymbolCoder> int read_int(SymbolCoder& coder, int min, int ma
     int maxval1 = (sign ? maxval : -(have+(1<<pos)));
     int minval0 = (sign ? minval : -(have+left));
     int maxval0 = (sign ? have+left : maxval);
-    if (!range_test(minval1,maxval1)) { // 1-bit is impossible
+    if (!signed_test(range_test,minval1,maxval1,1)) { // 1-bit is impossible
       bit = 0;
-    } else if (range_test(minval0,maxval0)) { // 0-bit and 1-bit are both possible
+    } else if (signed_test(range_test,minval0,maxval0,1)) { // 0-bit and 1-bit are both possible
       bit = coder.readMant(pos);
     }
     have |= (bit << pos);
@@ -109,29 +115,23 @@ template <typename SymbolCoder> int read_int(SymbolCoder& coder, int min, int ma
   return (sign ? a : -a);
 }
 
-static inline int signed_test(int(*range_test)(int,int), int low, int high, int sign) {
-  if (low > high) return 0;
-  if (sign > 0) return range_test(low, high);
-  return range_test(-high, -low);
-}
-
 template <typename SymbolCoder> void write_int(SymbolCoder& coder, int min, int max, int(*range_test)(int, int), int &value) {
     assert(min<=max);
     assert(value>=min);
     assert(value<=max);
-    assert(range_test(min,max));
+    assert(signed_test(range_test,min,max,1));
 
     // avoid doing anything if the value is already known (this line is optional; behavior should be identical if commented out)
-    if (range_test(min,max) == 1) return;
+    if (signed_test(range_test,min,max,1) == 1) return;
 
     if (value) { // value is nonzero
       // only output zero bit if value could also have been zero
-      if (max >= 0 && min <= 0 && range_test(0,0)) coder.writeZero(false);
+      if (max >= 0 && min <= 0 && signed_test(range_test,0,0,1)) coder.writeZero(false);
       int sign = (value > 0 ? 1 : -1);
       int amin = 1, amax = value < 0 ? -min : max;
       if (max > 0 && min < 0) {
         // only output sign bit if value can be both pos and neg
-        if (range_test(min,-1) && range_test(1,max)) coder.writeSign(sign);
+        if (signed_test(range_test,min,-1,1) && signed_test(range_test,1,max,1)) coder.writeSign(sign);
       } else {
         amin = (max < 0) ? -max : min;
       }
