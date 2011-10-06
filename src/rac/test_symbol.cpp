@@ -15,7 +15,7 @@ int main() {
 
   int prev = 0; 
   for (int i=0; i<text.size(); i++) {
-    unsigned char curr = text[i];
+    signed char curr = text[i];
     int diff = curr - prev;
     int min = -128 - prev;
     int max = 127 - prev;
@@ -32,12 +32,13 @@ int main() {
 
   int prev = 0;
   for (int i=0; i<text.size(); i++) {
-    unsigned char curr = text[i];
+    signed char curr = text[i];
     int min = -128 - prev;
     int max = 127 - prev;
     int diff = read_int(coder, min, max, default_range_test);
     prev = prev + diff;
-    assert(curr == prev);
+    if (curr != prev)
+      printf("Fail: pos %i should be %i, but decoded %i\n",i,curr,prev);
   }
   fclose(f);
   }
