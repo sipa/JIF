@@ -1,4 +1,5 @@
 #include <string>
+#include <stdio.h>
 #include <assert.h>
 
 #include "symbol.h"
@@ -13,30 +14,36 @@ int main() {
   RacOutput40 rac(f);
   SimpleSymbolCoder<SimpleBitChance, RacOutput40> coder(rac,8);
 
-  int prev = 0; 
-  for (int i=0; i<text.size(); i++) {
-    unsigned char curr = text[i];
+  int prev = 0;
+  for (unsigned int i=0; i<text.size(); i++) {
+    char curr = text[i];
     int diff = curr - prev;
-    int min = -128 - prev;
-    int max = 127 - prev;
+    int min = 0 - prev;
+    int max = 255 - prev;
     prev = curr;
+//    fprintf(stdout,"writing %i in %i..%i\n",diff,min,max);
     write_int(coder, min, max, default_range_test, diff);
   }
   rac.flush();
   fclose(f);
   }
+
+  fprintf(stdout,"\nReading... \n");
+
   {
   FILE *f = fopen("test.dat","r");
   RacInput40 rac(f);
   SimpleSymbolCoder<SimpleBitChance, RacInput40> coder(rac,8);
 
   int prev = 0;
-  for (int i=0; i<text.size(); i++) {
-    unsigned char curr = text[i];
-    int min = -128 - prev;
-    int max = 127 - prev;
+  for (unsigned int i=0; i<text.size(); i++) {
+    char curr = text[i];
+    int min = 0 - prev;
+    int max = 255 - prev;
     int diff = read_int(coder, min, max, default_range_test);
+//    fprintf(stdout,"read %i in %i..%i\n",diff,min,max);
     prev = prev + diff;
+    fprintf(stdout,"%c",(char) prev);
     assert(curr == prev);
   }
   fclose(f);

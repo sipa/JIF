@@ -1,6 +1,8 @@
 #ifndef _RAC_SYMBOL_H_
 #define _RAC_SYMBOL_H_ 1
 
+#include <stdio.h>
+
 #include <vector>
 #include <assert.h>
 #include "util.h"
@@ -35,17 +37,30 @@ public:
     rac = &racIn;
   }
 
-  void inline writeZero(bool bit) { write(ctx.bitZero(), bit); }
-  void inline writeSign(bool bit) { write(ctx.bitSign(), bit); }
-  void inline writeExp(int i, bool bit) { write(ctx.bitExp(i), bit); }
-  void inline writeMant(int i, bool bit) { write(ctx.bitMant(i), bit); }
-  bool inline readZero() { return read(ctx.bitZero()); }
-  bool inline readSign() { return read(ctx.bitSign()); }
-  bool inline readExp(int i) { return read(ctx.bitExp(i)); }
-  bool inline readMant(int i) { return read(ctx.bitMant(i)); }
+  void inline writeZero(bool bit) { //fprintf(stdout,"Zero(%i)",bit);
+     write(ctx.bitZero(), bit); }
+  void inline writeSign(bool bit) { //fprintf(stdout,"Sign(%i)",bit);
+     write(ctx.bitSign(), bit); }
+  void inline writeExp(int i, bool bit) { //fprintf(stdout,"Exp(%i,%i)",i,bit);
+     write(ctx.bitExp(i), bit); }
+  void inline writeMant(int i, bool bit) { //fprintf(stdout,"Mant(%i,%i)",i,bit);
+     write(ctx.bitMant(i), bit); }
+  bool inline readZero() { bool bit = read(ctx.bitZero());
+     //fprintf(stdout,"Zero(%i)",bit); 
+     return bit;}
+  bool inline readSign() { bool bit = read(ctx.bitSign());
+     // fprintf(stdout,"Sign(%i)",bit);
+     return bit; }
+  bool inline readExp(int i) { bool bit = read(ctx.bitExp(i)); 
+     // fprintf(stdout,"Exp(%i,%i)",i,bit);
+     return bit; }
+  bool inline readMant(int i) { bool bit = read(ctx.bitMant(i));
+     // fprintf(stdout,"Mant(%i,%i)",i,bit);
+     return bit; }
 };
 
 int default_range_test(int a, int b) {
+  if (b < a) return 0;
   assert(b >= a);
   return (b-a+1);
 }
@@ -69,24 +84,26 @@ template <typename SymbolCoder> int read_int(SymbolCoder& coder, int min, int ma
   }
   if (sign && min <= 0) min = 1;
   if (!sign && max >= 0) max = -1;
-  
-  unsigned int emin = ilog2((sign ? abs(min) : abs(max)));
-  unsigned int emax = ilog2((sign ? abs(max) : abs(min)));
-  unsigned int i = emin;
+
+  int emin = ilog2((sign ? abs(min) : abs(max)));
+  int emax = ilog2((sign ? abs(max) : abs(min)));
+//  fprintf(stdout,"min=%i,max=%i,emin:%i,emax:%i",min,max,emin,emax);
+  int i = emin;
   while (i < emax) {
     // if exponent >i is impossible, we are done
     if (sign && !range_test(1<<(i+1),max)) break;
     if (!sign && !range_test(min,-(1<<(i+1)))) break;
     // if exponent i is possible, output the exponent bit
-    if ((sign && range_test(1<<i,(1<<(i+1))-1)) || (!sign && !range_test(1-(1<<(i+1)),-(1<<i)))) {
+    if ((sign && range_test(1<<i,(1<<(i+1))-1)) || (!sign && range_test(1-(1<<(i+1)),-(1<<i)))) {
       if (coder.readExp(i)) break;
     }
     i++;
   }
   int e = i;
+//  fprintf(stdout,"exp=%i",e);
   int have = (1 << e);
   int left = (1 << e)-1;
-  for (unsigned int pos = e; pos>0;) {
+  for (int pos = e; pos>0;) {
     int bit = 1;
     int minval = (sign ? have : -(have+left));
     int maxval = (sign ? have+left : -have);
@@ -127,29 +144,33 @@ template <typename SymbolCoder> void write_int(SymbolCoder& coder, int min, int 
     if (value) { // value is nonzero
       // only output zero bit if value could also have been zero
       if (max >= 0 && min <= 0 && range_test(0,0)) coder.writeZero(false);
-      int sign = (value > 0 ? 1 : -1);
-      int amin = 1, amax = value < 0 ? -min : max;
+      int sign = (value > 0 ? 1 : 0);
       if (max > 0 && min < 0) {
         // only output sign bit if value can be both pos and neg
         if (range_test(min,-1) && range_test(1,max)) coder.writeSign(sign);
-      } else {
-        amin = (max < 0) ? -max : min;
       }
-      const unsigned int a = abs(value);
-      const unsigned int e = ilog2(a);
-      unsigned int emin = ilog2(amin);
-      unsigned int emax = ilog2(amax);
-      unsigned int i = emin;
+      if (sign && min <= 0) min = 1;
+      if (!sign && max >= 0) max = -1;
+      const int a = abs(value);
+      const int e = ilog2(a);
+      int emin = ilog2((sign ? abs(min) : abs(max)));
+      int emax = ilog2((sign ? abs(max) : abs(min)));
+//      fprintf(stdout,"min=%i,max=%i,emin:%i,emax:%i",min,max,emin,emax);
+      int i = emin;
       while (i < emax) {
         // if exponent >i is impossible, we are done
-        if (!signed_test(range_test, 1 << (i+1), max, sign)) break;
-        if (!signed_test(range_test, 1 << i, (1 << (i+1)) - 1, sign))
+        if (sign && !range_test(1<<(i+1),max)) break;
+        if (!sign && !range_test(min,-(1<<(i+1)))) break;
+        // if exponent i is possible, output the exponent bit
+        if ((sign && range_test(1<<i,(1<<(i+1))-1)) || (!sign && range_test(1-(1<<(i+1)),-(1<<i))))
             coder.writeExp(i, i==e);
+        if (i==e) break;
         i++;
       }
+//      fprintf(stdout,"exp=%i",e);
       int have = (1 << e);
       int left = (1 << e)-1;
-      for (unsigned int pos = e; pos>0;) {
+      for (int pos = e; pos>0;) {
         int bit = 1;
         int minabs = have, maxabs = have+left;
         left ^= (1 << (--pos));
