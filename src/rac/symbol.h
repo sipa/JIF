@@ -109,6 +109,12 @@ template <typename SymbolCoder> int read_int(SymbolCoder& coder, int min, int ma
   return (sign ? a : -a);
 }
 
+static inline int signed_test(int(*range_test)(int,int), int low, int high, int sign) {
+  if (low > high) return 0;
+  if (sign > 0) return range_test(low, high);
+  return range_test(-high, -low);
+}
+
 template <typename SymbolCoder> void write_int(SymbolCoder& coder, int min, int max, int(*range_test)(int, int), int &value) {
     assert(min<=max);
     assert(value>=min);
@@ -122,29 +128,23 @@ template <typename SymbolCoder> void write_int(SymbolCoder& coder, int min, int 
       // only output zero bit if value could also have been zero
       if (max >= 0 && min <= 0 && range_test(0,0)) coder.writeZero(false);
       int sign = (value > 0 ? 1 : -1);
-      int amin = 1;
+      int amin = 1, amax = value < 0 ? -min : max;
       if (max > 0 && min < 0) {
         // only output sign bit if value can be both pos and neg
         if (range_test(min,-1) && range_test(1,max)) coder.writeSign(sign);
       } else {
-        amin = 
-      int amin = 
-      if (sign > 0 && min <= 0) min = 1;
-      if (sign < 0 && max >= 0) max = -1;
+        amin = (max < 0) ? -max : min;
+      }
       const unsigned int a = abs(value);
       const unsigned int e = ilog2(a);
-      unsigned int emin = ilog2((sign ? abs(min) : abs(max)));
-      unsigned int emax = ilog2((sign ? abs(max) : abs(min)));
+      unsigned int emin = ilog2(amin);
+      unsigned int emax = ilog2(amax);
       unsigned int i = emin;
       while (i < emax) {
         // if exponent >i is impossible, we are done
-        if (sign && !range_test(1<<(i+1),max)) break;
-        if (!sign && !range_test(min,-(1<<(i+1)))) break;
-        // if exponent i is possible, output the exponent bit
-        if ( (sign && range_test(1<<i,(1<<(i+1))-1))
-         || (!sign && !range_test(1-(1<<(i+1)),-(1<<i))))
-                coder.writeExp(i, i==e);
-        if (i == e) break;
+        if (!signed_test(range_test, 1 << (i+1), max, sign)) break;
+        if (!signed_test(range_test, 1 << i, (1 << (i+1)) - 1, sign))
+            coder.writeExp(i, i==e);
         i++;
       }
       int have = (1 << e);
@@ -152,19 +152,13 @@ template <typename SymbolCoder> void write_int(SymbolCoder& coder, int min, int 
       for (unsigned int pos = e; pos>0;) {
         int bit = 1;
         int minabs = have, maxabs = have+left;
-        int minval = (sign ? have : -(have+left));
-        int maxval = (sign ? have+left : -have);
-        if (min > minval) minval = min;
-        if (max < maxval) maxval = max;
         left ^= (1 << (--pos));
-        if (range_test(minval,maxval)==1) return;
-        int minval1 = (sign ? have+(1<<pos) : minval);
-        int maxval1 = (sign ? maxval : -(have+(1<<pos)));
-        int minval0 = (sign ? minval : -(have+left));
-        int maxval0 = (sign ? have+left : maxval);
-        if (!range_test(minval1,maxval1)) { // 1-bit is impossible
+        if (signed_test(range_test,minabs,maxabs,sign)==1) return;
+        int minabs1 = have + (1<<pos), maxabs1 = maxabs;
+        int minabs0 = minabs, maxabs0 = have + left;
+        if (!signed_test(range_test,minabs1,maxabs1,sign)) { // 1-bit is impossible
            bit = 0;
-        } else if (range_test(minval0,maxval0)) { // 0-bit and 1-bit are both possible
+        } else if (signed_test(range_test,minabs0,maxabs0,sign)) { // 0-bit and 1-bit are both possible
            bit = (a >> pos) & 1;
            coder.writeMant(pos,bit);
         }
