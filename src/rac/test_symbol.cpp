@@ -45,6 +45,8 @@ int main() {
     prev = prev + diff;
     fprintf(stdout,"%c",(char) prev);
     assert(curr == prev);
+    if (curr != prev)
+      printf("Fail: pos %i should be %i, but decoded %i\n",i,curr,prev);
   }
   fclose(f);
   }
