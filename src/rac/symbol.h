@@ -8,11 +8,19 @@
 #include "util.h"
 #include "chance.h"
 
-template <typename BitChance> class SymbolContext {
+typedef enum {
+  BIT_ZERO,
+  BIT_SIGN,
+  BIT_EXP,
+  BIT_MANT
+} SymbolChanceBitType;
+
+template <typename BitChance> class SymbolChance {
   int bits;
   std::vector<BitChance> chances;
 
 public:
+
   BitChance inline &bitZero()      { return chances[0]; }
   BitChance inline &bitSign()      { return chances[1]; }
 
@@ -21,42 +29,41 @@ public:
   BitChance inline &bitExp(int i)  { assert(i >= 0 && i < bits-1); return chances[2+i]; }
   BitChance inline &bitMant(int i) { assert(i >= 0 && i < bits); return chances[bits+1+i]; }
 
-  SymbolContext(int bitsin) : bits(bitsin), chances(2*bits+1) { }
+  BitChance inline &bit(SymbolChanceBitType typ, int i = 0) {
+    switch (typ) {
+      case BIT_ZERO: return bitZero();
+      case BIT_SIGN: return bitSign();
+      case BIT_EXP:  return bitExp(i);
+      case BIT_MANT: return bitMant(i);
+    }
+  }
+
+  SymbolChance(int bitsin) : bits(bitsin), chances(2*bits+1) { }
 };
 
 template <typename BitChance, typename RAC> class SimpleSymbolCoder {
 private:
-  SymbolContext<BitChance> ctx;
+  SymbolChance<BitChance> ctx;
   RAC *rac;
-
-  void inline write(BitChance& bch, bool bit) { rac->write(bch.get(), bit); bch.put(bit); }
-  bool inline read(BitChance& bch) { bool bit = rac->read(bch.get()); bch.put(bit); return bit; }
 
 public:
   SimpleSymbolCoder(RAC& racIn, int nBits) : ctx(nBits) {
     rac = &racIn;
   }
 
-  void inline writeZero(bool bit) { //fprintf(stdout,"Zero(%i)",bit);
-     write(ctx.bitZero(), bit); }
-  void inline writeSign(bool bit) { //fprintf(stdout,"Sign(%i)",bit);
-     write(ctx.bitSign(), bit); }
-  void inline writeExp(int i, bool bit) { //fprintf(stdout,"Exp(%i,%i)",i,bit);
-     write(ctx.bitExp(i), bit); }
-  void inline writeMant(int i, bool bit) { //fprintf(stdout,"Mant(%i,%i)",i,bit);
-     write(ctx.bitMant(i), bit); }
-  bool inline readZero() { bool bit = read(ctx.bitZero());
-     //fprintf(stdout,"Zero(%i)",bit); 
-     return bit;}
-  bool inline readSign() { bool bit = read(ctx.bitSign());
-     // fprintf(stdout,"Sign(%i)",bit);
-     return bit; }
-  bool inline readExp(int i) { bool bit = read(ctx.bitExp(i)); 
-     // fprintf(stdout,"Exp(%i,%i)",i,bit);
-     return bit; }
-  bool inline readMant(int i) { bool bit = read(ctx.bitMant(i));
-     // fprintf(stdout,"Mant(%i,%i)",i,bit);
-     return bit; }
+  void inline write(bool bit, SymbolChanceBitType typ, int i = 0) { 
+    BitChance& bch = ctx.bit(typ,i);
+    rac->write(bch.get(), bit);
+    bch.put(bit);
+  }
+
+  bool inline read(SymbolChanceBitType typ, int i = 0) { 
+    BitChance& bch = ctx.bit(typ,i);
+    bool bit = rac->read(bch.get());
+    bch.put(bit);
+    return bit;
+  }
+
 };
 
 int default_range_test(int a, int b) {
@@ -79,12 +86,12 @@ template <typename SymbolCoder> int read_int(SymbolCoder& coder, int min, int ma
 
   if (max >= 0 && min <= 0 && range_test(0,0)) {
     if (!signed_test(range_test,min,-1,1) && !signed_test(range_test,1,max,1)) return 0;
-    if (coder.readZero()) return 0;
+    if (coder.read(BIT_ZERO)) return 0;
   }
 
   bool sign = true;
   if (max > 0 && min < 0 && signed_test(range_test,min,-1,1) && signed_test(range_test,1,max,1)) {
-    sign = coder.readSign();
+    sign = coder.read(BIT_SIGN);
   } else {
     if (min < 0 || !signed_test(range_test,1,max,1)) sign = false;
   }
@@ -101,7 +108,7 @@ template <typename SymbolCoder> int read_int(SymbolCoder& coder, int min, int ma
     if (!sign && !signed_test(range_test,min,-(1<<(i+1)),1)) break;
     // if exponent i is possible, output the exponent bit
     if ((sign && range_test(1<<i,(1<<(i+1))-1)) || (!sign && range_test(1-(1<<(i+1)),-(1<<i)))) {
-      if (coder.readExp(i)) break;
+      if (coder.read(BIT_EXP,i)) break;
     }
     i++;
   }
@@ -124,7 +131,7 @@ template <typename SymbolCoder> int read_int(SymbolCoder& coder, int min, int ma
     if (!signed_test(range_test,minval1,maxval1,1)) { // 1-bit is impossible
       bit = 0;
     } else if (signed_test(range_test,minval0,maxval0,1)) { // 0-bit and 1-bit are both possible
-      bit = coder.readMant(pos);
+      bit = coder.read(BIT_MANT,pos);
     }
     have |= (bit << pos);
   }
@@ -143,11 +150,11 @@ template <typename SymbolCoder> void write_int(SymbolCoder& coder, int min, int 
 
     if (value) { // value is nonzero
       // only output zero bit if value could also have been zero
-      if (max >= 0 && min <= 0 && range_test(0,0)) coder.writeZero(false);
+      if (max >= 0 && min <= 0 && range_test(0,0)) coder.write(false,BIT_ZERO);
       int sign = (value > 0 ? 1 : 0);
       if (max > 0 && min < 0) {
         // only output sign bit if value can be both pos and neg
-        if (range_test(min,-1) && range_test(1,max)) coder.writeSign(sign);
+        if (range_test(min,-1) && range_test(1,max)) coder.write(sign,BIT_SIGN);
       }
       if (sign && min <= 0) min = 1;
       if (!sign && max >= 0) max = -1;
@@ -163,7 +170,7 @@ template <typename SymbolCoder> void write_int(SymbolCoder& coder, int min, int 
         if (!sign && !range_test(min,-(1<<(i+1)))) break;
         // if exponent i is possible, output the exponent bit
         if ((sign && range_test(1<<i,(1<<(i+1))-1)) || (!sign && range_test(1-(1<<(i+1)),-(1<<i))))
-            coder.writeExp(i, i==e);
+            coder.write(i==e, BIT_EXP, i);
         if (i==e) break;
         i++;
       }
@@ -181,14 +188,14 @@ template <typename SymbolCoder> void write_int(SymbolCoder& coder, int min, int 
            bit = 0;
         } else if (signed_test(range_test,minabs0,maxabs0,sign)) { // 0-bit and 1-bit are both possible
            bit = (a >> pos) & 1;
-           coder.writeMant(pos,bit);
+           coder.write(bit, BIT_MANT, pos);
         }
         have |= (bit << pos);
       }
 
     } else { // value is zero
       // only output zero bit if value could also have been nonzero
-      if (range_test(min,-1) || range_test(1,max)) coder.writeZero(true);
+      if (range_test(min,-1) || range_test(1,max)) coder.write(true, BIT_ZERO);
     }
 }
 

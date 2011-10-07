@@ -20,6 +20,10 @@ public:
 extern SimpleBitChanceTable sbcTable;
 
 class SimpleBitChance {
+private:
+  static const uint16_t log4k[4097];
+  static const double log4k_base;
+
 protected:
   uint16_t chance; // stored as a 12-bit number
 
@@ -34,6 +38,14 @@ public:
 
   void inline put(bool bit) {
     chance = sbcTable.next[bit][chance];
+  }
+
+  void estim(bool bit, uint64_t &total) {
+    total += log4k[bit ? chance : 4096-chance];
+  }
+
+  double static calcBits(uint64_t estim) {
+    return log4k_base*estim;
   }
 };
 
