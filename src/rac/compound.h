@@ -32,31 +32,31 @@ private:
 
   void inline updateVirt(SymbolChanceBitType type, int i, bool bit) {
     for (int j=0; chances->virtChances.size(); j++) {
-      BitChance& virt = select[j] ? chances->virtChances[j].first.bit(type,i)
-                                  : chances->virtChances[j].second.bit(type,i);
-      virt.update(bit, chances->virtSize[j]);
+      BitChance& virt = (*select)[j] ? chances->virtChances[j].first.bit(type,i)
+                                     : chances->virtChances[j].second.bit(type,i);
+      virt.estim(bit, chances->virtSize[j]);
       virt.put(bit);
     }
   }
 
-  void inline write(SymbolChanceBitType type, int i, bool bit) { 
+public:
+  void inline write(bool bit, SymbolChanceBitType type, int i = 0) { 
     BitChance& real = chances->realChances.bit(type,i);
     rac.write(real.get(), bit);
-    real.update(bit, chances->realSize);
+    real.estim(bit, chances->realSize);
     real.put(bit);
-    updateVirt(bit);
+    updateVirt(type, i, bit);
   }
 
-  bool inline read(SymbolChanceBitType type, int i) { 
+  bool inline read(SymbolChanceBitType type, int i = 0) { 
     BitChance& real = chances->realChances.bit(type,i);
     bool bit = rac.read(real.get());
-    real.update(bit, chances->realSize);
+    real.estim(bit, chances->realSize);
     real.put(bit);
-    updateVirt(bit);
+    updateVirt(type, i, bit);
     return bit;
   }
 
-public:
   CompoundSymbolCoder(RAC& racIn) : rac(racIn) {
     chances = NULL;
     select = NULL;
@@ -66,13 +66,13 @@ public:
   int read_int(CompoundSymbolChances<BitChance>& chancesIn, std::vector<bool> &selectIn, int min, int max, int(*range_test)(int, int)) {
     chances = &chancesIn;
     select = &selectIn;
-    return read_int<CompoundSymbolCoder<BitChance,RAC> >(this, min, max, range_test);
+    return reader(*this, min, max, range_test);
   }
 
   void write_int(CompoundSymbolChances<BitChance>& chancesIn, std::vector<bool> &selectIn, int min, int max, int(*range_test)(int, int), int val) {
     chances = &chancesIn;
     select = &selectIn;
-    write_int<CompoundSymbolCoder<BitChance,RAC> >(this, min, max, range_test, val);
+    writer(*this, min, max, range_test, val);
   }
 
 };

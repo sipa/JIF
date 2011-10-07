@@ -78,7 +78,7 @@ static inline int signed_test(int(*range_test)(int,int), int low, int high, int 
   return range_test(-high, -low);
 }
 
-template <typename SymbolCoder> int read_int(SymbolCoder& coder, int min, int max, int(*range_test)(int, int)) {
+template <typename SymbolCoder> int reader(SymbolCoder& coder, int min, int max, int(*range_test)(int, int)) {
   assert(min<=max);
   assert(range_test(min,max));
 
@@ -139,7 +139,7 @@ template <typename SymbolCoder> int read_int(SymbolCoder& coder, int min, int ma
   return (sign ? a : -a);
 }
 
-template <typename SymbolCoder> void write_int(SymbolCoder& coder, int min, int max, int(*range_test)(int, int), int &value) {
+template <typename SymbolCoder> void writer(SymbolCoder& coder, int min, int max, int(*range_test)(int, int), int &value) {
     assert(min<=max);
     assert(value>=min);
     assert(value<=max);
