@@ -34,7 +34,7 @@ public:
   }
 
   uint16_t inline get() {
-    return chance*16+8;
+    return chance*16; // return 16-bit number
   }
 
   void inline put(bool bit) {

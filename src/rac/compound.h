@@ -31,7 +31,7 @@ private:
   std::vector<bool> *select;
 
   void inline updateVirt(SymbolChanceBitType type, int i, bool bit) {
-    for (int j=0; chances->virtChances.size(); j++) {
+    for (int j=0; j<chances->virtChances.size(); j++) {
       BitChance& virt = (*select)[j] ? chances->virtChances[j].first.bit(type,i)
                                      : chances->virtChances[j].second.bit(type,i);
       virt.estim(bit, chances->virtSize[j]);
