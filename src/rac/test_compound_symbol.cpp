@@ -15,7 +15,7 @@ int main() {
   FILE *f = fopen("test.dat","w");
   RacOutput40 rac(f);
   CompoundSymbolChances<SimpleBitChance> chances(2,8);
-  std::vector<bool> selection(2);
+  std::vector<bool> selection(2, false);
   CompoundSymbolCoder<SimpleBitChance, RacOutput40> coder(rac);
 
   int prev = 0;
@@ -38,7 +38,7 @@ int main() {
   FILE *f = fopen("test.dat","r");
   RacInput40 rac(f);
   CompoundSymbolChances<SimpleBitChance> chances(2,8);
-  std::vector<bool> selection(2);
+  std::vector<bool> selection(2, false);
   CompoundSymbolCoder<SimpleBitChance, RacInput40> coder(rac);
 
   int prev = 0;

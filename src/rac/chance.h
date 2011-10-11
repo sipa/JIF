@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-void extern build_table(uint16_t *zero_state, uint16_t *one_state, size_t size, int factor, int max_p);
+void extern build_table(uint16_t *zero_state, uint16_t *one_state, size_t size, int factor, unsigned int max_p);
 
 class SimpleBitChanceTable {
   friend class SimpleBitChance;

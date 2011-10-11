@@ -3,10 +3,11 @@
 
 #include "chance.h"
 
-void build_table(uint16_t *zero_state, uint16_t *one_state, size_t size, int factor, int max_p) {
+void build_table(uint16_t *zero_state, uint16_t *one_state, size_t size, int factor, unsigned int max_p) {
   const int64_t one = 1LL << 32;
   int64_t p;
-  int last_p8, p8, i;
+  unsigned int last_p8, p8;
+  unsigned int i;
 
   memset(zero_state,0,sizeof(uint16_t) * size);
   memset(one_state,0,sizeof(uint16_t) * size);

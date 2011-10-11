@@ -25,8 +25,8 @@ int main() {
     std::vector<int> properties(2,prev);
     int diff = curr - prev;
 //    fprintf(stdout,"writing %i in %i..%i\n",diff,min,max);
-    coder.write_int(properties, min, max, default_range_test, diff);
     prev = curr;
+    coder.write_int(properties, min, max, default_range_test, diff);
 //    fprintf(stdout,"%c",(char) prev);
   }
   rac.flush();
