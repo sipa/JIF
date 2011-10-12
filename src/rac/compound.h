@@ -124,7 +124,7 @@ private:
     //std::vector<std:pair<int,int> > current_ranges = range;
     int pos = 0;
     while(inner_node[pos].property != -1) {
-        fprintf(stderr,"Checking property %i (val=%i, splitval=%i)\n",inner_node[pos].property,properties[inner_node[pos].property],inner_node[pos].splitval);
+//        fprintf(stderr,"Checking property %i (val=%i, splitval=%i)\n",inner_node[pos].property,properties[inner_node[pos].property],inner_node[pos].splitval);
         if (properties[inner_node[pos].property] > inner_node[pos].splitval) {
                 pos = inner_node[pos].left;
                 //current_ranges[inner_node[pos].property].first = inner_node[pos].splitval + 1;
@@ -133,6 +133,7 @@ private:
                 //current_ranges[inner_node[pos].property].second = inner_node[pos].splitval;
         }
     }
+//    fprintf(stdout,"Returning leaf node %i\n", inner_node[pos].left);
     CompoundSymbolChances<BitChance> &result = leaf_node[inner_node[pos].left];
 
     if(result.best_property != -1 && result.realSize > result.virtSize[result.best_property] + CONTEXT_TREE_SPLIT_THRESHOLD) {
@@ -143,10 +144,10 @@ private:
         inner_node[pos].property = p;
         int new_leaf = leaf_node.size();
         result.resetCounters();
-        leaf_node.push_back(result);
+        leaf_node.push_back(CompoundSymbolChances<BitChance>(result));
         inner_node[pos].right = new_leaf;
         if (properties[p] > inner_node[pos].splitval) {
-                return result;
+                return leaf_node[inner_node[pos].left];
         } else {
                 return leaf_node[new_leaf];
         }
@@ -178,13 +179,15 @@ public:
   int read_int(std::vector<int> &properties, int min, int max, int(*range_test)(int, int)) {
     CompoundSymbolChances<BitChance> &chances = find_leaf(properties);
     set_selection_and_update_property_sums(properties,chances);
-    return coder.read_int(chances,selection, min, max, range_test);
+    CompoundSymbolChances<BitChance> &chances2 = find_leaf(properties);
+    return coder.read_int(chances2,selection, min, max, range_test);
   }
 
   void write_int(std::vector<int> &properties, int min, int max, int(*range_test)(int, int), int val) {
     CompoundSymbolChances<BitChance> &chances = find_leaf(properties);
     set_selection_and_update_property_sums(properties,chances);
-    coder.write_int(chances,selection, min, max, range_test, val);
+    CompoundSymbolChances<BitChance> &chances2 = find_leaf(properties);
+    coder.write_int(chances2,selection, min, max, range_test, val);
   }
 
 };
