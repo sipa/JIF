@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include "symbol.h"
 
-#define CONTEXT_TREE_SPLIT_THRESHOLD 5461*4
+#define CONTEXT_TREE_SPLIT_THRESHOLD 5461*1
 // 4 bit improvement needed before splitting
 
 template <typename BitChance> class CompoundSymbolChances {
@@ -48,14 +48,17 @@ private:
 
     signed short int best_property = -1;
     uint64_t best_size = chances->realSize;
+//    fprintf(stdout,"RealSize: %lu ||",best_size);
     for (unsigned int j=0; j<chances->virtChances.size(); j++) {
       BitChance& virt = (*select)[j] ? chances->virtChances[j].first.bit(type,i)
                                      : chances->virtChances[j].second.bit(type,i);
       virt.estim(bit, chances->virtSize[j]);
       virt.put(bit);
       if (chances->virtSize[j] < best_size) { best_size = chances->virtSize[j]; best_property = j; }
+//      fprintf(stdout,"Virt(%u)Size: %lu ||",j,chances->virtSize[j]);
     }
     chances->best_property = best_property;
+//    fprintf(stdout,"\n");
   }
   BitChance inline & bestChance(SymbolChanceBitType type, int i = 0) {
         signed short int p = chances->best_property;
@@ -104,11 +107,12 @@ public:
 
 class PropertyDecisionNode {
 public:
-  int property;
+  int property;         // -1 : leaf node, childID refers to leaf_node
+                        // 0..nb_properties-1 : childID refers to left branch  (in inner_node)
+                        //                      childID+1 refers to right branch
   int splitval;
-  int left;
-  int right;
-  PropertyDecisionNode(int p=-1, int s=0, int l=0, int r=0) : property(p), splitval(s), left(l), right(r) {}
+  int childID;
+  PropertyDecisionNode(int p=-1, int s=0, int c=0) : property(p), splitval(s), childID(c) {}
 };
 
 template <typename BitChance, typename RAC> class PropertySymbolCoder {
@@ -126,28 +130,36 @@ private:
     while(inner_node[pos].property != -1) {
 //        fprintf(stderr,"Checking property %i (val=%i, splitval=%i)\n",inner_node[pos].property,properties[inner_node[pos].property],inner_node[pos].splitval);
         if (properties[inner_node[pos].property] > inner_node[pos].splitval) {
-                pos = inner_node[pos].left;
+                pos = inner_node[pos].childID;
                 //current_ranges[inner_node[pos].property].first = inner_node[pos].splitval + 1;
         } else {
-                pos = inner_node[pos].right;
+                pos = inner_node[pos].childID+1;
                 //current_ranges[inner_node[pos].property].second = inner_node[pos].splitval;
         }
     }
-//    fprintf(stdout,"Returning leaf node %i\n", inner_node[pos].left);
-    CompoundSymbolChances<BitChance> &result = leaf_node[inner_node[pos].left];
+//    fprintf(stdout,"Returning leaf node %i\n", inner_node[pos].childID);
+    CompoundSymbolChances<BitChance> &result = leaf_node[inner_node[pos].childID];
 
     if(result.best_property != -1 && result.realSize > result.virtSize[result.best_property] + CONTEXT_TREE_SPLIT_THRESHOLD) {
     // split leaf node if some virtual context is performing (significantly) better
         int p = result.best_property;
+        int new_inner = inner_node.size();
+        inner_node.push_back(inner_node[pos]);
+        inner_node.push_back(inner_node[pos]);
         inner_node[pos].splitval = result.virtPropSum[p]/result.count;
         fprintf(stdout,"Splitting on property %i, splitval=%i (count=%i)\n",p,inner_node[pos].splitval, result.count);
         inner_node[pos].property = p;
         int new_leaf = leaf_node.size();
         result.resetCounters();
         leaf_node.push_back(CompoundSymbolChances<BitChance>(result));
-        inner_node[pos].right = new_leaf;
+        int old_leaf = inner_node[pos].childID;
+        inner_node[pos].childID = new_inner;
+        // should be OK:
+        //inner_node[new_inner].childID = old_leaf;
+        assert(inner_node[new_inner].childID == old_leaf);
+        inner_node[new_inner+1].childID = new_leaf;
         if (properties[p] > inner_node[pos].splitval) {
-                return leaf_node[inner_node[pos].left];
+                return leaf_node[old_leaf];
         } else {
                 return leaf_node[new_leaf];
         }
@@ -161,8 +173,10 @@ private:
     chances.count++;
     for(unsigned int i=0; i<nb_properties;i++) {
         chances.virtPropSum[i] += properties[i];
+//        fprintf(stdout,"Property %i: %i ||",i,properties[i]);
         selection[i] = (properties[i] > chances.virtPropSum[i]/chances.count);
     }
+//    fprintf(stdout,"\n");
   }
 
 public:

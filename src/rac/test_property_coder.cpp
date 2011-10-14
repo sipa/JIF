@@ -18,16 +18,15 @@ int main() {
   PropertySymbolCoder<SimpleBitChance, RacOutput40> coder(rac,ranges,8);
 
   int prev = 0;
+  int prev2 = 0;
   for (unsigned int i=0; i<text.size(); i++) {
     char curr = text[i];
-    int min = 0 - prev;
-    int max = 255 - prev;
-    std::vector<int> properties(2,prev);
-    int diff = curr - prev;
+    std::vector<int> properties(1,prev);
+    properties.push_back(prev ^ prev2);
 //    fprintf(stdout,"writing %i in %i..%i\n",diff,min,max);
+    prev2 = prev;
     prev = curr;
-    coder.write_int(properties, min, max, default_range_test, diff);
-//    fprintf(stdout,"%c",(char) prev);
+    coder.write_int(properties, 0, 255, default_range_test, curr);
   }
   rac.flush();
   fclose(f);
@@ -41,18 +40,19 @@ int main() {
   PropertySymbolCoder<SimpleBitChance, RacInput40> coder(rac,ranges,8);
 
   int prev = 0;
+  int prev2 = 0;
   for (unsigned int i=0; i<text.size(); i++) {
     char curr = text[i];
-    int min = 0 - prev;
-    int max = 255 - prev;
-    std::vector<int> properties(2,prev);
-    int diff = coder.read_int(properties, min, max, default_range_test);
+    std::vector<int> properties(1,prev);
+    properties.push_back(prev ^ prev2);
+    int c = coder.read_int(properties, 0, 255, default_range_test);
 //    fprintf(stdout,"read %i in %i..%i\n",diff,min,max);
-    prev = prev + diff;
-    fprintf(stdout,"%c",(char) prev);
-    if (curr != prev)
-      printf("Fail: pos %i should be %i, but decoded %i\n",i,curr,prev);
-    assert(curr == prev);
+    prev2 = prev;
+    prev = c;
+    fprintf(stdout,"%c",(char) c);
+    if (curr != c)
+      printf("Fail: pos %i should be %i, but decoded %i\n",i,curr,c);
+    assert(curr == c);
   }
   fclose(f);
   }
