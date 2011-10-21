@@ -10,6 +10,33 @@
 //             i = 1 * r          - 1 * b
 //             q = 0.5*r  - 1*g   + 0.5*b
 
+class RGBToBWTransformer : public Transformer {
+
+  class RGBToBWTransformerData : public TransformerData { }
+
+  void transform(const ImageData &in, ImageData &out) { 
+    out = in;
+    out.remove_plane(RED);
+    out.remove_plane(GREEN);
+    out.remove_plane(BLUE);
+    Plane &RP = in.plane(RED);
+    Plane &GP = in.plane(GREEN);
+    Plane &BP = in.plane(BLUE);
+    MetaData &RM = in.metadata(RED);
+    MetaData &GM = in.metadata(GREEN);
+    MetaData &BM = in.metadata(BLUE);
+    if (RM.info->is_simple() && GM.info->is_simple() && BM.info->is_simple()) {
+    } else {
+      
+    }
+
+    out.add_plane(Y);
+    Plane &YP = out.plane(Y);
+    MetaData &YM = in.metadata(Y);
+    
+  }
+}
+
 ImageData RGB_to_YIQ(ImageData &in, uint32_t frame = 0) {
         ImageData out = in;
         out.remove_plane(RED, frame);

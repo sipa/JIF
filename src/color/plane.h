@@ -16,6 +16,8 @@ static const std::vector<plane_semantics> RGBA(aRGBA, aRGBA+4);
 static const plane_semantics aYIQA[4] = {Y, I, Q, ALPHA};
 static const std::vector<plane_semantics> YIQA(aYIQA, aYIQA+4);
 
+typedef int RACIn;
+typedef int RACOut;
 
 class Plane {
 public:
@@ -40,6 +42,32 @@ public:
 };
 
 
+class PlaneColorInfo {
+public:
+  pixel_t min, max;
+  virtual static bool is_simple() {
+    return false;
+  }
+
+  // @pre: low>=min, high<=max
+  virtual int range_test(int x, int y, pixel_t low, pixel_t high)=0;
+}
+
+class SimplePlaneColorInfo : public PlaneColorInfo {
+public:
+  static bool is_simple() {
+    return true;
+  }
+
+  int range_test(int x, int y, pixel_t low, pixel_t high) {
+    if (high<low) return 0;
+    if (high==low) return 1;
+    return 2;
+  }
+
+  SimplePlaneColorInfo(pixel_t min, pixel_t max) : min(min), max(max) { }
+}
+
 class MetaData {
 public:
   plane_semantics plane_type;
@@ -55,8 +83,10 @@ public:
   uint16_t offset_x;     //
   uint16_t offset_y;
 
-  MetaData(plane_semantics pt, uint8_t bd = 8, uint16_t s = 1, uint8_t zx = 1, uint8_t zy = 1, uint32_t fn = 0, uint16_t zi = 0, uint16_t ox = 0, uint16_t oy = 0) :
-        plane_type(pt), bit_depth(bd), stretch(s), zoom_factor_x(zx), zoom_factor_y(zy), frame_number(fn), z_index(zi), offset_x(ox), offset_y(oy) 
+  PlaneColorInfo *info;
+
+  MetaData(plane_semantics pt, PlaneColorInfo *cpi, uint8_t bd = 8, uint16_t s = 1, uint8_t zx = 1, uint8_t zy = 1, uint32_t fn = 0, uint16_t zi = 0, uint16_t ox = 0, uint16_t oy = 0) :
+        plane_type(pt), bit_depth(bd), stretch(s), zoom_factor_x(zx), zoom_factor_y(zy), frame_number(fn), z_index(zi), offset_x(ox), offset_y(oy), info(cpi)
         {}
 };
 
@@ -93,6 +123,13 @@ public:
         assert(reverse_index[frame][p] >= 0); // -1 if the plane does not exist
         return data[reverse_index[frame][p]];
   }
+  MetaData& metadata(plane_semantics p, uint32_t frame = 0) {
+        assert(frame <= nb_frames);
+        assert( ! using_z_index); // todo: handle multiple (possibly overlapping) planes per frame
+        assert(reverse_index[frame][p] >= 0); // -1 if the plane does not exist
+        return info[reverse_index[frame][p]];
+  }
+
   pixel_t inline get(plane_semantics p, uint16_t x, uint16_t y, uint32_t frame = 0) {
         assert(frame <= nb_frames);
         assert( ! using_z_index); // todo: handle multiple (possibly overlapping) planes per frame
@@ -113,24 +150,24 @@ public:
         construct_reverse_index();
         assert(reverse_index[frame][p] == -1);
   }
-  void add_plane(plane_semantics p, uint32_t frame = 0) {
+  void add_plane(plane_semantics p, uint32_t frame = 0, PlaneColorInfo *pci) {
         assert(frame <= nb_frames);
         assert( ! using_z_index); // todo: handle multiple (possibly overlapping) planes per frame
         assert(info.size() == data.size());
         int pos = info.size();
-        info.push_back(MetaData(p));
+        info.push_back(MetaData(p, pci));
         data.push_back(Plane(height, width));
         construct_reverse_index();
         assert(reverse_index[frame][p] == pos);
   }
   // constructor that takes image size and a list of plane types, and creates a one-frame image where each plane type fits the canvas size
-  ImageData(uint16_t h, uint16_t w, std::vector<plane_semantics> pt = RGBA) : height(h), width(w) {
+  ImageData(uint16_t h, uint16_t w, std::vector<PlaneColorInfo *> pci, std::vector<plane_semantics> pt = RGBA) : height(h), width(w) {
         using_z_index = false;
         nb_frames = 1;
         int nb_planes = pt.size();
         std::vector<int> ri(NB_PLANE_SEMANTICS, -1);
         for(int i = 0; i < nb_planes; i++) {
-                info.push_back(MetaData(pt[i]));
+                info.push_back(MetaData(pt[i], pci[i]));
                 data.push_back(Plane(h, w));
                 ri[pt[i]] = i;
         }
@@ -139,3 +176,31 @@ public:
 };
 
 
+// represents transformer instance
+// transformer objects are maintained during encode/decode for all transformers involved
+class Transformer {
+public:
+  // initialization during encode
+  void virtual transform(const ImageData &in, ImageData &out) =0;
+  
+  // serialization during encode
+  void virtual serialize(RACOut &rac) const =0;
+
+  // deserialization during decode
+  void virtual deserialize(RACIn &rac) =0;
+
+  // apply transformation on metadata only during decode
+  void virtual transformMeta(const ImageData &in, ImageData &out) const =0;
+
+  // apply inverse transformation on data and metadata during decode
+  void virtual transformInv(const ImageData &in, ImageData &out) const =0;
+}
+
+class TransformerFactory {
+public:
+  Transformer* deserialize(RACIn &rac) {
+  }
+
+  void serialize(RACOut &rac, Transformer* trans) {
+  }
+}
