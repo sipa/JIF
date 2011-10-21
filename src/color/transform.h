@@ -1,5 +1,7 @@
 //#include "plane.h"
 
+
+
 // echte YIQ: y = 0.299*r + 0.587*g + 0.114*b
 //            i = 0.595716*r - 0.274453*g -0.321263*b
 //            q = 0.211456*r - 0.522591*g +0.311135*b
@@ -8,42 +10,66 @@
 //             i = 1 * r          - 1 * b
 //             q = 0.5*r  - 1*g   + 0.5*b
 
-YIQA_Image RGBA_to_YIQA(RGBA_Image &in) {
-        YIQA_Image out(in.height, in.width);
-        out.A = in.A;
+ImageData RGB_to_YIQ(ImageData &in, uint32_t frame = 0) {
+        ImageData out = in;
+        out.remove_plane(RED, frame);
+        out.remove_plane(GREEN, frame);
+        out.remove_plane(BLUE, frame);
+        out.add_plane(Y);
+        out.add_plane(I);
+        out.add_plane(Q);
+        Plane &RP = in.plane(RED, frame);
+        Plane &GP = in.plane(GREEN, frame);
+        Plane &BP = in.plane(BLUE, frame);
+        Plane &YP = out.plane(Y, frame);
+        Plane &IP = out.plane(I, frame);
+        Plane &QP = out.plane(Q, frame);
         for (int y=0; y<in.height; y++) {
           for (int x=0; x<in.width; x++) {
-            int R = in.R.get(x,y);
-            int G = in.G.get(x,y);
-            int B = in.B.get(x,y);
-            int Y = ((R + B) / 2 + G) / 2;
-            int I = R - B;
-            int Q = (R + B) / 2 - G;
+            int R = RP.get(x,y);
+            int G = GP.get(x,y);
+            int B = BP.get(x,y);
 
-            out.Y.set(x,y,Y);
-            out.I.set(x,y,I);
-            out.Q.set(x,y,Q);
+            int vY = ((R + B) / 2 + G) / 2;
+            int vI = R - B + 255;
+            int vQ = (R + B) / 2 - G + 255;
+
+            YP.set(x,y,vY);
+            IP.set(x,y,vI);
+            QP.set(x,y,vQ);
           }
         }
         return out;
 }
 
-RGBA_Image YIQA_to_RGBA(YIQA_Image &in) {
-       RGBA_Image out(in.height, in.width);
-       out.A = in.A;
-       for (int y=0; y<in.height; y++) {
+ImageData YIQ_to_RGB(ImageData &in, uint32_t frame = 0) {
+        ImageData out = in;
+        out.remove_plane(Y, frame);
+        out.remove_plane(I, frame);
+        out.remove_plane(Q, frame);
+        out.add_plane(RED, frame);
+        out.add_plane(GREEN, frame);
+        out.add_plane(BLUE, frame);
+        Plane &YP = in.plane(Y, frame);
+        Plane &IP = in.plane(I, frame);
+        Plane &QP = in.plane(Q, frame);
+        Plane &RP = out.plane(RED, frame);
+        Plane &GP = out.plane(GREEN, frame);
+        Plane &BP = out.plane(BLUE, frame);
+        for (int y=0; y<in.height; y++) {
           for (int x=0; x<in.width; x++) {
-            int Y = in.Y.get(x,y);
-            int I = in.I.get(x,y);
-            int Q = in.Q.get(x,y);
-            int R = Y + (Q + 257) / 2 + (I + 257) / 2 - 256;
-            int G = Y - (Q + 256) / 2 + 128;
-            int B = Y + (Q + 257) / 2 - (I + 256) / 2;
+            int vY = YP.get(x,y);
+            int vI = IP.get(x,y);
+            int vQ = QP.get(x,y);
 
-            out.R.set(x,y,R);
-            out.G.set(x,y,G);
-            out.B.set(x,y,B);
+            int R = vY + (vQ + 2) / 2 + (vI + 2) / 2 - 256;
+            int G = vY - (vQ + 1) / 2 + 128;
+            int B = vY + (vQ + 2) / 2 - (vI + 1) / 2;
+
+            RP.set(x,y,R);
+            GP.set(x,y,G);
+            BP.set(x,y,B);
           }
-       }
-       return out;
+        }
+        return out;
 }
