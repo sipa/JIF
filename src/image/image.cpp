@@ -44,6 +44,10 @@ bool Image::save(const char *filename) const {
   return false;
 }
 
+void Image::add_plane(int width, int height, int min, int max) {
+    planes.push_back(Plane(width, height, min, max));
+}
+
 void Image::init(int width, int height, int min, int max, int planes) {
     this->planes = std::vector<Plane>(planes, Plane(width, height, min, max));
 }

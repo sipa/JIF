@@ -16,7 +16,7 @@ public:
     Plane() { init(0,0,0,0); }
     void init(int width, int height, ColorVal min, ColorVal max);
     ColorVal &operator()(int r, int c) { return data[r*width + c]; }
-    const ColorVal &operator()(int r, int c) const { return data[r*width + c]; }
+    ColorVal operator()(int r, int c) const { return data[r*width + c]; }
 };
 
 class Image
@@ -26,9 +26,11 @@ protected:
 public:
 
     Image(int width, int height, ColorVal min, ColorVal max, int planes) { init(width, height, min, max, planes); }
-    Image() { init(0,0,0,0,0); }
+    Image() { reset(); }
 
     void init(int width, int height, ColorVal min, ColorVal max, int planes);
+    void reset() { init(0,0,0,0,0); }
+    void add_plane(int width, int height, ColorVal min, ColorVal max);
     bool load(const char *name);
     bool save(const char *name) const;
     Plane &operator()(int plane) { 
