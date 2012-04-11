@@ -3,7 +3,8 @@
 #include <stdint.h>
 #include "symbol.h"
 
-#define CONTEXT_TREE_SPLIT_THRESHOLD 5461*1
+// #define CONTEXT_TREE_SPLIT_THRESHOLD 5461*1
+#define CONTEXT_TREE_SPLIT_THRESHOLD 1
 // 4 bit improvement needed before splitting
 
 template <typename BitChance> class CompoundSymbolChances {
@@ -37,7 +38,7 @@ public:
 
 template <typename BitChance, typename RAC> class CompoundSymbolCoder {
 private:
-  RAC& rac;
+  RAC* rac;
   CompoundSymbolChances<BitChance> *chances;
   std::vector<bool> *select;
 
@@ -70,20 +71,20 @@ private:
 public:
   void inline write(bool bit, SymbolChanceBitType type, int i = 0) {
     BitChance& ch = bestChance(type, i);
-    rac.write(ch.get(), bit);
+    rac->write(ch.get(), bit);
 //    fprintf(stdout,"Wrote %i with chance %i\n",bit,ch.get());
     updateChances(type, i, bit);
   }
 
   bool inline read(SymbolChanceBitType type, int i = 0) {
     BitChance& ch = bestChance(type, i);
-    bool bit = rac.read(ch.get());
+    bool bit = rac->read(ch.get());
 //    fprintf(stdout,"Read %i with chance %i\n",bit,ch.get());
     updateChances(type, i, bit);
     return bit;
   }
 
-  CompoundSymbolCoder(RAC& racIn) : rac(racIn) {
+  CompoundSymbolCoder(RAC& racIn) : rac(&racIn) {
     chances = NULL;
     select = NULL;
   }
@@ -147,7 +148,7 @@ private:
         inner_node.push_back(inner_node[pos]);
         inner_node.push_back(inner_node[pos]);
         inner_node[pos].splitval = result.virtPropSum[p]/result.count;
-        fprintf(stdout,"Splitting on property %i, splitval=%i (count=%i)\n",p,inner_node[pos].splitval, result.count);
+        fprintf(stdout,"Splitting on property %i, splitval=%i (count=%i)\n",p,inner_node[pos].splitval, (int)result.count);
         inner_node[pos].property = p;
         int new_leaf = leaf_node.size();
         result.resetCounters();

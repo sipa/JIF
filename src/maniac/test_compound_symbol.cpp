@@ -1,13 +1,13 @@
 #include <string>
 #include <stdio.h>
 #include <assert.h>
+#include <fstream>
+#include <iostream>
 
 #include "symbol.h"
 #include "rac.h"
 #include "chance.h"
 #include "compound.h"
-
-std::string text = "The licenses for most software and other practical works are designed to take away your freedom to share and change the works.  By contrast, the GNU General Public License is intended to guarantee your freedom to share and change all versions of a program--to make sure it remains free software for all its users.  We, the Free Software Foundation, use the GNU General Public License for most of our software; it applies also to any other work released this way by its authors.  You can apply it to your programs, too.";
 
 int main() {
   // encode
@@ -19,7 +19,7 @@ int main() {
   CompoundSymbolCoder<SimpleBitChance, RacOutput40> coder(rac);
 
   int prev = 0;
-  for (unsigned int i=0; i<text.size(); i++) {
+  for (unsigned int i=0; i<size; i++) {
     char curr = text[i];
     int diff = curr - prev;
     int min = 0 - prev;
