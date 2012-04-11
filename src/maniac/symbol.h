@@ -31,6 +31,7 @@ public:
 
   BitChance inline &bit(SymbolChanceBitType typ, int i = 0) {
     switch (typ) {
+      default:
       case BIT_ZERO: return bitZero();
       case BIT_SIGN: return bitSign();
       case BIT_EXP:  return bitExp(i);
@@ -139,7 +140,7 @@ template <typename SymbolCoder> int reader(SymbolCoder& coder, int min, int max,
   return (sign ? a : -a);
 }
 
-template <typename SymbolCoder> void writer(SymbolCoder& coder, int min, int max, int(*range_test)(int, int), int &value) {
+template <typename SymbolCoder> void writer(SymbolCoder& coder, int min, int max, int(*range_test)(int, int), int value) {
     assert(min<=max);
     assert(value>=min);
     assert(value<=max);
