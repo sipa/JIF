@@ -15,6 +15,8 @@ typedef enum {
   BIT_MANT
 } SymbolChanceBitType;
 
+static const char *SymbolChanceBitName[] = {"zero", "sign", "expo", "mant"};
+
 template <typename BitChance> class SymbolChance {
   int bits;
   std::vector<BitChance> chances;
@@ -42,71 +44,48 @@ public:
   SymbolChance(int bitsin) : bits(bitsin), chances(2*bits+1) { }
 };
 
-int range_test(int a, int b) {
-  if (b < a) return 0;
-  assert(b >= a);
-  return (b-a+1);
-}
-
-static inline int signed_test(int(*range_test)(int,int), int low, int high, int sign) {
-  if (low > high) return 0;
-  if (sign > 0) return range_test(low, high);
-  return range_test(-high, -low);
-}
-
 template <typename SymbolCoder> int reader(SymbolCoder& coder, int min, int max) {
   assert(min<=max);
-  assert(range_test(min,max));
 
   if (min == max) return min; // nodig?
 
-  if (max >= 0 && min <= 0 && range_test(0,0)) {
-    if (!signed_test(range_test,min,-1,1) && !signed_test(range_test,1,max,1)) return 0;
+  if (max >= 0 && min <= 0) {
     if (coder.read(BIT_ZERO)) return 0;
   }
 
   bool sign = true;
-  if (max > 0 && min < 0 && signed_test(range_test,min,-1,1) && signed_test(range_test,1,max,1)) {
+  if (max > 0 && min < 0) {
     sign = coder.read(BIT_SIGN);
   } else {
-    if (min < 0 || !signed_test(range_test,1,max,1)) sign = false;
+    if (min < 0) sign = false;
   }
   if (sign && min <= 0) min = 1;
   if (!sign && max >= 0) max = -1;
 
-  int emin = ilog2((sign ? abs(min) : abs(max)));
-  int emax = ilog2((sign ? abs(max) : abs(min)));
-//  fprintf(stdout,"min=%i,max=%i,emin:%i,emax:%i",min,max,emin,emax);
+  int amin = sign ? abs(min) : abs(max);
+  int amax = sign ? abs(max) : abs(min);
+  int emin = ilog2(amin), emax = ilog2(amax);
+//  fprintf(stderr,"min=%i,max=%i,emin:%i,emax:%i\n",min,max,emin,emax);
   int i = emin;
-  while (i < emax) {
+  for (; i < emax; i++) {
     // if exponent >i is impossible, we are done
-    if (sign && !signed_test(range_test,1<<(i+1),max,1)) break;
-    if (!sign && !signed_test(range_test,min,-(1<<(i+1)),1)) break;
-    // if exponent i is possible, output the exponent bit
-    if ((sign && range_test(1<<i,(1<<(i+1))-1)) || (!sign && range_test(1-(1<<(i+1)),-(1<<i)))) {
-      if (coder.read(BIT_EXP,i)) break;
-    }
-    i++;
+    if ((1 << (i+1)) > amax) break;
+    if (coder.read(BIT_EXP,i)) break;
   }
   int e = i;
-//  fprintf(stdout,"exp=%i",e);
+//  fprintf(stderr,"exp=%i\n",e);
   int have = (1 << e);
   int left = (1 << e)-1;
   for (int pos = e; pos>0;) {
     int bit = 1;
-    int minval = (sign ? have : -(have+left));
-    int maxval = (sign ? have+left : -have);
-    if (min > minval) minval = min;
-    if (max < maxval) maxval = max;
     left ^= (1 << (--pos));
-    if (minval == maxval) return minval;
-    int minval1 = (sign ? have+(1<<pos) : minval);
-    int maxval1 = (sign ? maxval : -(have+(1<<pos)));
-    int minval0 = (sign ? minval : -(have+left));
-    int maxval0 = (sign ? have+left : maxval);
-    if (!signed_test(range_test,minval1,maxval1,1)) { // 1-bit is impossible
+    int minabs1 = have | (1<<pos);
+    // int maxabs1 = have | left | (1<<pos);
+    // int minabs0 = have;
+    int maxabs0 = have | left;
+    if (minabs1 > amax) { // 1-bit is impossible
       bit = 0;
-    } else if (signed_test(range_test,minval0,maxval0,1)) { // 0-bit and 1-bit are both possible
+    } else if (maxabs0 >= amin) { // 0-bit and 1-bit are both possible
       bit = coder.read(BIT_MANT,pos);
     }
     have |= (bit << pos);
@@ -116,63 +95,60 @@ template <typename SymbolCoder> int reader(SymbolCoder& coder, int min, int max)
 }
 
 template <typename SymbolCoder> void writer(SymbolCoder& coder, int min, int max, int value) {
-    assert(min<=max);
-    assert(value>=min);
-    assert(value<=max);
-    assert(signed_test(range_test,min,max,1));
+  assert(min<=max);
+  assert(value>=min);
+  assert(value<=max);
 
-    // avoid doing anything if the value is already known (this line is optional; behavior should be identical if commented out)
-    if (signed_test(range_test,min,max,1) == 1) return;
+  // avoid doing anything if the value is already known (this line is optional; behavior should be identical if commented out)
+  if (min == max) return;
 
-    if (value) { // value is nonzero
-      // only output zero bit if value could also have been zero
-      if (max >= 0 && min <= 0 && range_test(0,0)) coder.write(false,BIT_ZERO);
-      int sign = (value > 0 ? 1 : 0);
-      if (max > 0 && min < 0) {
-        // only output sign bit if value can be both pos and neg
-        if (range_test(min,-1) && range_test(1,max)) coder.write(sign,BIT_SIGN);
-      }
-      if (sign && min <= 0) min = 1;
-      if (!sign && max >= 0) max = -1;
-      const int a = abs(value);
-      const int e = ilog2(a);
-      int emin = ilog2((sign ? abs(min) : abs(max)));
-      int emax = ilog2((sign ? abs(max) : abs(min)));
-//      fprintf(stdout,"min=%i,max=%i,emin:%i,emax:%i",min,max,emin,emax);
-      int i = emin;
-      while (i < emax) {
-        // if exponent >i is impossible, we are done
-        if (sign && !range_test(1<<(i+1),max)) break;
-        if (!sign && !range_test(min,-(1<<(i+1)))) break;
-        // if exponent i is possible, output the exponent bit
-        if ((sign && range_test(1<<i,(1<<(i+1))-1)) || (!sign && range_test(1-(1<<(i+1)),-(1<<i))))
-            coder.write(i==e, BIT_EXP, i);
-        if (i==e) break;
-        i++;
-      }
-//      fprintf(stdout,"exp=%i",e);
-      int have = (1 << e);
-      int left = (1 << e)-1;
-      for (int pos = e; pos>0;) {
-        int bit = 1;
-        int minabs = have, maxabs = have+left;
-        left ^= (1 << (--pos));
-        if (signed_test(range_test,minabs,maxabs,sign)==1) return;
-        int minabs1 = have + (1<<pos), maxabs1 = maxabs;
-        int minabs0 = minabs, maxabs0 = have + left;
-        if (!signed_test(range_test,minabs1,maxabs1,sign)) { // 1-bit is impossible
-           bit = 0;
-        } else if (signed_test(range_test,minabs0,maxabs0,sign)) { // 0-bit and 1-bit are both possible
-           bit = (a >> pos) & 1;
-           coder.write(bit, BIT_MANT, pos);
-        }
-        have |= (bit << pos);
-      }
+  if (value == 0) { // value is nonzero
+    // only output zero bit if value could also have been nonzero
+    if (max > 0 || min < 0) coder.write(true, BIT_ZERO);
+  }
 
-    } else { // value is zero
-      // only output zero bit if value could also have been nonzero
-      if (range_test(min,-1) || range_test(1,max)) coder.write(true, BIT_ZERO);
+  // only output zero bit if value could also have been zero
+  if (max >= 0 && min <= 0) coder.write(false,BIT_ZERO);
+  int sign = (value > 0 ? 1 : 0);
+  if (max > 0 && min < 0) {
+    // only output sign bit if value can be both pos and neg
+    if (min < 0 && max > 0) coder.write(sign,BIT_SIGN);
+  }
+  if (sign && min <= 0) min = 1;
+  if (!sign && max >= 0) max = -1;
+  const int a = abs(value);
+  const int e = ilog2(a);
+  int amin = sign ? abs(min) : abs(max);
+  int amax = sign ? abs(max) : abs(min);
+  int emin = ilog2(amin), emax = ilog2(amax);
+//  fprintf(stderr,"min=%i,max=%i,emin:%i,emax:%i\n",min,max,emin,emax);
+  int i = emin;
+  while (i < emax) {
+    // if exponent >i is impossible, we are done
+    if ((1 << (i+1)) > amax) break;
+    // if exponent i is possible, output the exponent bit
+    coder.write(i==e, BIT_EXP, i);
+    if (i==e) break;
+    i++;
+  }
+//  fprintf(stderr,"exp=%i\n",e);
+  int have = (1 << e);
+  int left = (1 << e)-1;
+  for (int pos = e; pos>0;) {
+    int bit = 1;
+    left ^= (1 << (--pos));
+    int minabs1 = have | (1<<pos);
+    // int maxabs1 = have | left | (1<<pos);
+    // int minabs0 = have;
+    int maxabs0 = have | left;
+    if (minabs1 > amax) { // 1-bit is impossible
+      bit = 0;
+    } else if (maxabs0 >= amin) { // 0-bit and 1-bit are both possible
+      bit = (a >> pos) & 1;
+      coder.write(bit, BIT_MANT, pos);
     }
+    have |= (bit << pos);
+  }
 }
 
 template <typename BitChance, typename RAC> class SimpleSymbolBitCoder {

@@ -73,6 +73,7 @@ public:
     BitChance& ch = bestChance(type, i);
     bool bit = rac.read(ch.get());
     updateChances(type, i, bit);
+//    fprintf(stderr,"bit %s%i = %s\n", SymbolChanceBitName[type], i, bit ? "true" : "false");
     return bit;
   }
 
@@ -80,6 +81,7 @@ public:
     BitChance& ch = bestChance(type, i);
     rac.write(ch.get(), bit);
     updateChances(type, i, bit);
+//    fprintf(stderr,"bit %s%i = %s\n", SymbolChanceBitName[type], i, bit ? "true" : "false");
   }
 };
 

@@ -5,8 +5,6 @@
 
 #include "image/image.h"
 
-// FILE* debug = NULL;
-
 typedef std::vector<std::pair<int,int> > propRanges_t;
 typedef std::vector<int> props_t;
 
@@ -43,8 +41,8 @@ bool encode(const char* filename, const Image &image)
                 props_t properties;
                 ColorVal guess = prev;
                 ColorVal curr = plane(r,c);
-//                if (debug) fprintf(debug, "%i(%i,%i)\n", curr - guess, plane.min - guess, plane.max - guess);
                 coder.write_int(properties, plane.min - guess, plane.max - guess, curr - guess);
+//                fprintf(stderr, "%i(%i,%i)\n", curr - guess, plane.min - guess, plane.max - guess);
                 prev = curr;
             }
         }
@@ -85,7 +83,7 @@ bool decode(const char* filename, Image &image)
                 props_t properties;
                 ColorVal guess = prev;
                 ColorVal curr = coder.read_int(properties, plane.min - guess, plane.max - guess) + guess;
-//                if (debug) fprintf(debug, "%i(%i,%i)\n", curr - guess, plane.min - guess, plane.max - guess);
+//                fprintf(stderr, "%i(%i,%i)\n", curr - guess, plane.min - guess, plane.max - guess);
                 plane(r,c) = curr;
                 prev = curr;
             }
@@ -99,7 +97,6 @@ bool decode(const char* filename, Image &image)
 
 int main(int argc, char **argv)
 {
-//    debug = fopen("debug.log", "w");
     Image image;
     if (argc == 3) {
         image.load(argv[1]);
