@@ -42,32 +42,7 @@ public:
   SymbolChance(int bitsin) : bits(bitsin), chances(2*bits+1) { }
 };
 
-template <typename BitChance, typename RAC> class SimpleSymbolCoder {
-private:
-  SymbolChance<BitChance> ctx;
-  RAC *rac;
-
-public:
-  SimpleSymbolCoder(RAC& racIn, int nBits) : ctx(nBits) {
-    rac = &racIn;
-  }
-
-  void inline write(bool bit, SymbolChanceBitType typ, int i = 0) { 
-    BitChance& bch = ctx.bit(typ,i);
-    rac->write(bch.get(), bit);
-    bch.put(bit);
-  }
-
-  bool inline read(SymbolChanceBitType typ, int i = 0) { 
-    BitChance& bch = ctx.bit(typ,i);
-    bool bit = rac->read(bch.get());
-    bch.put(bit);
-    return bit;
-  }
-
-};
-
-int default_range_test(int a, int b) {
+int range_test(int a, int b) {
   if (b < a) return 0;
   assert(b >= a);
   return (b-a+1);
@@ -79,7 +54,7 @@ static inline int signed_test(int(*range_test)(int,int), int low, int high, int 
   return range_test(-high, -low);
 }
 
-template <typename SymbolCoder> int reader(SymbolCoder& coder, int min, int max, int(*range_test)(int, int)) {
+template <typename SymbolCoder> int reader(SymbolCoder& coder, int min, int max) {
   assert(min<=max);
   assert(range_test(min,max));
 
@@ -140,7 +115,7 @@ template <typename SymbolCoder> int reader(SymbolCoder& coder, int min, int max,
   return (sign ? a : -a);
 }
 
-template <typename SymbolCoder> void writer(SymbolCoder& coder, int min, int max, int(*range_test)(int, int), int value) {
+template <typename SymbolCoder> void writer(SymbolCoder& coder, int min, int max, int value) {
     assert(min<=max);
     assert(value>=min);
     assert(value<=max);
@@ -200,5 +175,45 @@ template <typename SymbolCoder> void writer(SymbolCoder& coder, int min, int max
     }
 }
 
+template <typename BitChance, typename RAC> class SimpleSymbolBitCoder {
+private:
+  SymbolChance<BitChance> &ctx;
+  RAC &rac;
+
+public:
+  SimpleSymbolBitCoder(SymbolChance<BitChance> &ctxIn, RAC &racIn) : ctx(ctxIn), rac(racIn) {}
+
+  void write(bool bit, SymbolChanceBitType typ, int i = 0) {
+    BitChance& bch = ctx.bit(typ,i);
+    rac.write(bch.get(), bit);
+    bch.put(bit);
+  }
+
+  bool read(SymbolChanceBitType typ, int i = 0) {
+    BitChance& bch = ctx.bit(typ,i);
+    bool bit = rac.read(bch.get());
+    bch.put(bit);
+    return bit;
+  }
+};
+
+template <typename BitChance, typename RAC> class SimpleSymbolCoder {
+private:
+  SymbolChance<BitChance> ctx;
+  RAC &rac;
+
+public:
+  SimpleSymbolCoder(RAC& racIn, int nBits) : ctx(nBits), rac(racIn) {}
+
+  void write_int(int min, int max, int value) {
+    SimpleSymbolBitCoder<BitChance, RAC> bitCoder(ctx, rac);
+    writer(bitCoder, min, max, value);
+  }
+
+  int read_int(int min, int max) {
+    SimpleSymbolBitCoder<BitChance, RAC> bitCoder(ctx, rac);
+    return reader(bitCoder, min, max);
+  }
+};
 
 #endif

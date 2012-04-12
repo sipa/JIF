@@ -5,6 +5,8 @@
 
 #include "image/image.h"
 
+// FILE* debug = NULL;
+
 typedef std::vector<std::pair<int,int> > propRanges_t;
 typedef std::vector<int> props_t;
 
@@ -20,13 +22,13 @@ bool encode(const char* filename, const Image &image)
 
     SimpleSymbolCoder<SimpleBitChance, RacOutput40> metaCoder(rac, 24);
     int numPlanes = image.numPlanes();
-    writer(metaCoder, 1, 16, default_range_test, numPlanes);
+    metaCoder.write_int(1, 16, numPlanes);
     for (int p = 0; p < numPlanes; p++) {
         const Plane& plane = image(p);
-        writer(metaCoder, 1, 65536, default_range_test, plane.width);
-        writer(metaCoder, 1, 65536, default_range_test, plane.height);
-        writer(metaCoder, -16777216, 16777215, default_range_test, plane.min);
-        writer(metaCoder, 0, 16777216, default_range_test, plane.max - plane.min);
+        metaCoder.write_int(1, 65536, plane.width);
+        metaCoder.write_int(1, 65536, plane.height);
+        metaCoder.write_int(-16777216, 16777215, plane.min);
+        metaCoder.write_int(0, 16777216, plane.max - plane.min);
     }
 
     for (int p = 0; p < image.numPlanes(); p++) {
@@ -41,7 +43,8 @@ bool encode(const char* filename, const Image &image)
                 props_t properties;
                 ColorVal guess = prev;
                 ColorVal curr = plane(r,c);
-                coder.write_int(properties, plane.min - guess, plane.max - guess, default_range_test, curr - guess);
+//                if (debug) fprintf(debug, "%i(%i,%i)\n", curr - guess, plane.min - guess, plane.max - guess);
+                coder.write_int(properties, plane.min - guess, plane.max - guess, curr - guess);
                 prev = curr;
             }
         }
@@ -60,12 +63,12 @@ bool decode(const char* filename, Image &image)
     RacInput40 rac(f);
 
     SimpleSymbolCoder<SimpleBitChance, RacInput40> metaCoder(rac, 24);
-    int numPlanes = reader(metaCoder, 1, 16, default_range_test);
+    int numPlanes = metaCoder.read_int(1, 16);
     for (int p = 0; p < numPlanes; p++) {
-        int width = reader(metaCoder, 1, 65536, default_range_test);
-        int height = reader(metaCoder, 1, 65536, default_range_test);
-        int min = reader(metaCoder, -16777216, 16777215, default_range_test);
-        int max = reader(metaCoder, 0, 16777216, default_range_test) + min;
+        int width = metaCoder.read_int(1, 65536);
+        int height = metaCoder.read_int(1, 65536);
+        int min = metaCoder.read_int(-16777216, 16777215);
+        int max = metaCoder.read_int(0, 16777216) + min;
         printf("Plane #%i: %ix%i [%i..%i]\n", p, width, height, min, max);
         image.add_plane(width, height, min, max);
     }
@@ -81,7 +84,8 @@ bool decode(const char* filename, Image &image)
             for (unsigned int c = 0; c < plane.width; c++) {
                 props_t properties;
                 ColorVal guess = prev;
-                ColorVal curr = coder.read_int(properties, plane.min - guess, plane.max - guess, default_range_test) + guess;
+                ColorVal curr = coder.read_int(properties, plane.min - guess, plane.max - guess) + guess;
+//                if (debug) fprintf(debug, "%i(%i,%i)\n", curr - guess, plane.min - guess, plane.max - guess);
                 plane(r,c) = curr;
                 prev = curr;
             }
@@ -95,6 +99,7 @@ bool decode(const char* filename, Image &image)
 
 int main(int argc, char **argv)
 {
+//    debug = fopen("debug.log", "w");
     Image image;
     if (argc == 3) {
         image.load(argv[1]);

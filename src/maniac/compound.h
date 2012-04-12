@@ -34,74 +34,70 @@ public:
                                                  { }
 };
 
-
-
-template <typename BitChance, typename RAC> class CompoundSymbolCoder {
+template <typename BitChance, typename RAC> class CompoundSymbolBitCoder {
 private:
-  RAC* rac;
-  CompoundSymbolChances<BitChance> *chances;
-  std::vector<bool> *select;
+  RAC &rac;
+  CompoundSymbolChances<BitChance> &chances;
+  std::vector<bool> &select;
 
   void inline updateChances(SymbolChanceBitType type, int i, bool bit) {
-    BitChance& real = chances->realChances.bit(type,i);
-    real.estim(bit, chances->realSize);
+    BitChance& real = chances.realChances.bit(type,i);
+    real.estim(bit, chances.realSize);
     real.put(bit);
 
     signed short int best_property = -1;
-    uint64_t best_size = chances->realSize;
+    uint64_t best_size = chances.realSize;
 //    fprintf(stdout,"RealSize: %lu ||",best_size);
-    for (unsigned int j=0; j<chances->virtChances.size(); j++) {
-      BitChance& virt = (*select)[j] ? chances->virtChances[j].first.bit(type,i)
-                                     : chances->virtChances[j].second.bit(type,i);
-      virt.estim(bit, chances->virtSize[j]);
+    for (unsigned int j=0; j<chances.virtChances.size(); j++) {
+      BitChance& virt = (select)[j] ? chances.virtChances[j].first.bit(type,i)
+                                    : chances.virtChances[j].second.bit(type,i);
+      virt.estim(bit, chances.virtSize[j]);
       virt.put(bit);
-      if (chances->virtSize[j] < best_size) { best_size = chances->virtSize[j]; best_property = j; }
+      if (chances.virtSize[j] < best_size) { best_size = chances.virtSize[j]; best_property = j; }
 //      fprintf(stdout,"Virt(%u)Size: %lu ||",j,chances->virtSize[j]);
     }
-    chances->best_property = best_property;
+    chances.best_property = best_property;
 //    fprintf(stdout,"\n");
   }
   BitChance inline & bestChance(SymbolChanceBitType type, int i = 0) {
-        signed short int p = chances->best_property;
-        return (p == -1 ? chances->realChances.bit(type,i)
-                        : ((*select)[p] ? chances->virtChances[p].first.bit(type,i)
-                                        : chances->virtChances[p].second.bit(type,i) ));
+        signed short int p = chances.best_property;
+        return (p == -1 ? chances.realChances.bit(type,i)
+                        : ((select)[p] ? chances.virtChances[p].first.bit(type,i)
+                                       : chances.virtChances[p].second.bit(type,i) ));
   }
 
 public:
-  void inline write(bool bit, SymbolChanceBitType type, int i = 0) {
-    BitChance& ch = bestChance(type, i);
-    rac->write(ch.get(), bit);
-//    fprintf(stdout,"Wrote %i with chance %i\n",bit,ch.get());
-    updateChances(type, i, bit);
-  }
+  CompoundSymbolBitCoder(RAC &racIn, CompoundSymbolChances<BitChance> &chancesIn, std::vector<bool> &selectIn) : rac(racIn), chances(chancesIn), select(selectIn) {}
 
-  bool inline read(SymbolChanceBitType type, int i = 0) {
+  bool read(SymbolChanceBitType type, int i = 0) {
     BitChance& ch = bestChance(type, i);
-    bool bit = rac->read(ch.get());
-//    fprintf(stdout,"Read %i with chance %i\n",bit,ch.get());
+    bool bit = rac.read(ch.get());
     updateChances(type, i, bit);
     return bit;
   }
 
-  CompoundSymbolCoder(RAC& racIn) : rac(&racIn) {
-    chances = NULL;
-    select = NULL;
+  void write(bool bit, SymbolChanceBitType type, int i = 0) {
+    BitChance& ch = bestChance(type, i);
+    rac.write(ch.get(), bit);
+    updateChances(type, i, bit);
+  }
+};
+
+template <typename BitChance, typename RAC> class CompoundSymbolCoder {
+private:
+  RAC &rac;
+public:
+  CompoundSymbolCoder(RAC& racIn) : rac(racIn) {}
+
+  int read_int(CompoundSymbolChances<BitChance> &chancesIn, std::vector<bool> &selectIn, int min, int max) {
+    CompoundSymbolBitCoder<BitChance, RAC> bitCoder(rac, chancesIn, selectIn);
+    return reader(bitCoder, min, max);
   }
 
-
-  int read_int(CompoundSymbolChances<BitChance>& chancesIn, std::vector<bool> &selectIn, int min, int max, int(*range_test)(int, int)) {
-    chances = &chancesIn;
-    select = &selectIn;
-    return reader(*this, min, max, range_test);
+  void write_int(CompoundSymbolChances<BitChance>& chancesIn, std::vector<bool> &selectIn, int min, int max, int val) {
+    CompoundSymbolBitCoder<BitChance, RAC> bitCoder(rac, chancesIn, selectIn);
+    writer(bitCoder, min, max, val);
   }
-
-  void write_int(CompoundSymbolChances<BitChance>& chancesIn, std::vector<bool> &selectIn, int min, int max, int(*range_test)(int, int), int val) {
-    chances = &chancesIn;
-    select = &selectIn;
-    writer(*this, min, max, range_test, val);
-  }
-
 };
 
 
@@ -191,18 +187,18 @@ public:
         {
         }
 
-  int read_int(std::vector<int> &properties, int min, int max, int(*range_test)(int, int)) {
+  int read_int(std::vector<int> &properties, int min, int max) {
     CompoundSymbolChances<BitChance> &chances = find_leaf(properties);
     set_selection_and_update_property_sums(properties,chances);
     CompoundSymbolChances<BitChance> &chances2 = find_leaf(properties);
-    return coder.read_int(chances2,selection, min, max, range_test);
+    return coder.read_int(chances2, selection, min, max);
   }
 
-  void write_int(std::vector<int> &properties, int min, int max, int(*range_test)(int, int), int val) {
+  void write_int(std::vector<int> &properties, int min, int max, int val) {
     CompoundSymbolChances<BitChance> &chances = find_leaf(properties);
     set_selection_and_update_property_sums(properties,chances);
     CompoundSymbolChances<BitChance> &chances2 = find_leaf(properties);
-    coder.write_int(chances2,selection, min, max, range_test, val);
+    coder.write_int(chances2, selection, min, max, val);
   }
 
 };
