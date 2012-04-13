@@ -4,7 +4,7 @@
 #include "symbol.h"
 
 // #define CONTEXT_TREE_SPLIT_THRESHOLD 5461*1
-#define CONTEXT_TREE_SPLIT_THRESHOLD 1
+#define CONTEXT_TREE_SPLIT_THRESHOLD 5461*10
 // k bit improvement needed before splitting
 
 template <typename BitChance> class CompoundSymbolChances
@@ -23,6 +23,7 @@ public:
         best_property = -1;
         realSize = 0;
         virtPropSum.assign(virtPropSum.size(),0);
+        virtSize.assign(virtSize.size(),0);
     }
 
     CompoundSymbolChances(int nProp, int nBits) : realChances(nBits),
@@ -63,7 +64,7 @@ private:
                 best_size = chances.virtSize[j];
                 best_property = j;
             }
-//      fprintf(stdout,"Virt(%u)Size: %lu ||",j,chances->virtSize[j]);
+//      fprintf(stdout,"Virt(%u)Size: %lu ||",j,chances.virtSize[j]);
         }
         chances.best_property = best_property;
 //    fprintf(stdout,"\n");

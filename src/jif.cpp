@@ -8,14 +8,18 @@
 typedef std::vector<std::pair<int,int> > propRanges_t;
 typedef std::vector<int> props_t;
 
-void static initPropRanges(propRanges_t &propRanges, const Image &image, int plane)
+void static initPropRanges(propRanges_t &propRanges, const Image &image, int p)
 {
     propRanges.clear();
-    int min = image.min(plane);
-    int max = image.max(plane);
+    int min = image.min(p);
+    int max = image.max(p);
     int mind = min - max, maxd = max - min;
 
     propRanges.push_back(std::make_pair(min,max));
+
+    for (int pp = 0; pp < p; pp++) {
+        propRanges.push_back(std::make_pair(image.min(pp), image.max(pp)));
+    }
     propRanges.push_back(std::make_pair(mind,maxd));
     propRanges.push_back(std::make_pair(mind,maxd));
     propRanges.push_back(std::make_pair(mind,maxd));
@@ -25,6 +29,9 @@ void static initPropRanges(propRanges_t &propRanges, const Image &image, int pla
 
 void static calcProps(props_t &properties, const Image &image, int p, int r, int c)
 {
+    for (int pp = 0; pp < p; pp++) {
+        properties.push_back(image(pp,r,c));
+    }
     properties.push_back(image(p,r,c-1)-image(p,r-1,c-1));  // left - topleft
     properties.push_back(image(p,r-1,c-1)-image(p,r-1,c));  // topleft - top
     properties.push_back(image(p,r-1,c)-image(p,r-1,c+1));  // top - topright
