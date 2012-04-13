@@ -102,9 +102,10 @@ template <typename SymbolCoder> void writer(SymbolCoder& coder, int min, int max
   // avoid doing anything if the value is already known (this line is optional; behavior should be identical if commented out)
   if (min == max) return;
 
-  if (value == 0) { // value is nonzero
+  if (value == 0) { // value is zero
     // only output zero bit if value could also have been nonzero
-    if (max > 0 || min < 0) coder.write(true, BIT_ZERO);
+    coder.write(true, BIT_ZERO);
+    return;
   }
 
   // only output zero bit if value could also have been zero
@@ -121,7 +122,7 @@ template <typename SymbolCoder> void writer(SymbolCoder& coder, int min, int max
   int amin = sign ? abs(min) : abs(max);
   int amax = sign ? abs(max) : abs(min);
   int emin = ilog2(amin), emax = ilog2(amax);
-//  fprintf(stderr,"min=%i,max=%i,emin:%i,emax:%i\n",min,max,emin,emax);
+  // fprintf(stderr,"amin=%i,amax=%i,emin:%i,emax:%i\n",min,max,emin,emax);
   int i = emin;
   while (i < emax) {
     // if exponent >i is impossible, we are done
@@ -163,12 +164,14 @@ public:
     BitChance& bch = ctx.bit(typ,i);
     rac.write(bch.get(), bit);
     bch.put(bit);
+//    fprintf(stderr,"bit %s%i = %s\n", SymbolChanceBitName[typ], i, bit ? "true" : "false");
   }
 
   bool read(SymbolChanceBitType typ, int i = 0) {
     BitChance& bch = ctx.bit(typ,i);
     bool bit = rac.read(bch.get());
     bch.put(bit);
+//    fprintf(stderr,"bit %s%i = %s\n", SymbolChanceBitName[typ], i, bit ? "true" : "false");
     return bit;
   }
 };
