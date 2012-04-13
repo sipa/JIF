@@ -95,7 +95,7 @@ bool encode(const char* filename, const Image &image)
                     properties.push_back(guess);
                     ColorVal curr = image(p,r,c);
                     calcProps(properties,image,p,r,c);
-                    coder.write_int(properties, image.min(p) - guess, image.max(p) - guess, curr - guess);
+                    coder.write_int(properties, image.min(p,r,c) - guess, image.max(p,r,c) - guess, curr - guess);
 //                  fprintf(stderr, "%i(%i,%i)\n", curr - guess, plane.min - guess, plane.max - guess);
                 }
             }
@@ -139,7 +139,7 @@ bool decode(const char* filename, Image &image)
                     ColorVal guess = predict(image,p,r,c);
                     properties.push_back(guess);
                     calcProps(properties,image,p,r,c);
-                    ColorVal curr = coder.read_int(properties, image.min(p) - guess, image.max(p) - guess) + guess;
+                    ColorVal curr = coder.read_int(properties, image.min(p,r,c) - guess, image.max(p,r,c) - guess) + guess;
 //                  fprintf(stderr, "%i(%i,%i)\n", curr - guess, plane.min - guess, plane.max - guess);
                     image(p,r,c) = curr;
                 }
