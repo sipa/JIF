@@ -4,7 +4,7 @@
 #include "symbol.h"
 
 // #define CONTEXT_TREE_SPLIT_THRESHOLD 5461*1
-#define CONTEXT_TREE_SPLIT_THRESHOLD 5461*10
+#define CONTEXT_TREE_SPLIT_THRESHOLD 5461*8*4
 // k bit improvement needed before splitting
 
 template <typename BitChance> class CompoundSymbolChances
@@ -163,7 +163,7 @@ private:
             inner_node.push_back(inner_node[pos]);
             inner_node.push_back(inner_node[pos]);
             inner_node[pos].splitval = result.virtPropSum[p]/result.count;
-            fprintf(stdout,"Splitting on property %i, splitval=%i (count=%i)\n",p,inner_node[pos].splitval, (int)result.count);
+//            fprintf(stdout,"Splitting on property %i, splitval=%i (count=%i)\n",p,inner_node[pos].splitval, (int)result.count);
             inner_node[pos].property = p;
             int new_leaf = leaf_node.size();
             result.resetCounters();

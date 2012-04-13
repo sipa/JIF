@@ -27,6 +27,7 @@ void static initPropRanges(propRanges_t &propRanges, const Image &image, int p)
     propRanges.push_back(std::make_pair(mind,maxd));
 }
 
+
 void static calcProps(props_t &properties, const Image &image, int p, int r, int c)
 {
     for (int pp = 0; pp < p; pp++) {
@@ -81,13 +82,17 @@ bool encode(const char* filename, const Image &image)
         metaCoder.write_int(0, 16777216, image.max(p) - image.min(p));
     }
 
+    std::vector<PropertySymbolCoder<JifBitChance, RacOutput40>*> coders;
     for (int p = 0; p < image.numPlanes(); p++) {
         propRanges_t propRanges;
         initPropRanges(propRanges,image,p);
         int nBits = ilog2((image.max(p)-image.min(p))*2-1)+1;
-        PropertySymbolCoder<JifBitChance, RacOutput40> coder(rac, propRanges, nBits);
-        for (int r = 0; r < image.rows(); r++) {
-            for (int c = 0; c < image.cols(); c++) {
+        coders.push_back(new PropertySymbolCoder<JifBitChance, RacOutput40>(rac, propRanges, nBits));
+    }
+
+    for (int r = 0; r < image.rows(); r++) {
+        for (int c = 0; c < image.cols(); c++) {
+            for (int p = 0; p < image.numPlanes(); p++) {
                 if (image.is_set(p,r,c))
                 {
                     props_t properties;
@@ -95,13 +100,16 @@ bool encode(const char* filename, const Image &image)
                     properties.push_back(guess);
                     ColorVal curr = image(p,r,c);
                     calcProps(properties,image,p,r,c);
-                    coder.write_int(properties, image.min(p,r,c) - guess, image.max(p,r,c) - guess, curr - guess);
-//                  fprintf(stderr, "%i(%i,%i)\n", curr - guess, plane.min - guess, plane.max - guess);
+                    coders[p]->write_int(properties, image.min(p,r,c) - guess, image.max(p,r,c) - guess, curr - guess);
                 }
             }
         }
     }
 
+    for (int p = 0; p < image.numPlanes(); p++) {
+        delete coders[p];
+    }
+ 
     rac.flush();
     fclose(f);
     return true;
@@ -127,20 +135,23 @@ bool decode(const char* filename, Image &image)
         image.add_plane(min, max, subSampleR, subSampleC);
     }
 
+    std::vector<PropertySymbolCoder<JifBitChance, RacInput40>*> coders;
     for (int p = 0; p < image.numPlanes(); p++) {
         propRanges_t propRanges;
         initPropRanges(propRanges,image,p);
         int nBits = ilog2((image.max(p)-image.min(p))*2-1)+1;
-        PropertySymbolCoder<JifBitChance, RacInput40> coder(rac, propRanges, nBits);
-        for (int r = 0; r < image.rows(); r++) {
-            for (int c = 0; c < image.cols(); c++) {
+        coders.push_back(new PropertySymbolCoder<JifBitChance, RacInput40>(rac, propRanges, nBits));
+    }
+
+    for (int r = 0; r < image.rows(); r++) {
+        for (int c = 0; c < image.cols(); c++) {
+            for (int p = 0; p < image.numPlanes(); p++) {
                 if (image.is_set(p,r,c)) {
                     props_t properties;
                     ColorVal guess = predict(image,p,r,c);
                     properties.push_back(guess);
                     calcProps(properties,image,p,r,c);
-                    ColorVal curr = coder.read_int(properties, image.min(p,r,c) - guess, image.max(p,r,c) - guess) + guess;
-//                  fprintf(stderr, "%i(%i,%i)\n", curr - guess, plane.min - guess, plane.max - guess);
+                    ColorVal curr = coders[p]->read_int(properties, image.min(p,r,c) - guess, image.max(p,r,c) - guess) + guess;
                     image(p,r,c) = curr;
                 }
             }
