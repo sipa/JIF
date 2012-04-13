@@ -63,7 +63,7 @@ ColorVal static predict(const Image &image, int p, int r, int c)
     return median3(left,top,gradient);
 }
 
-typedef MultiscaleBitChance<SimpleBitChance> JifBitChance;
+typedef MultiscaleBitChance<3,SimpleBitChance> JifBitChance;
 
 bool encode(const char* filename, const Image &image)
 {
