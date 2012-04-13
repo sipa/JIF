@@ -69,8 +69,8 @@ bool image_save_pnm(const char *filename, const Image& image)
         return false;
     }
 
-    ColorVal max = std::max(std::max(image(0).max, image(1).max), image(2).max);
-    ColorVal min = std::min(std::min(image(0).min, image(1).min), image(2).min);
+    ColorVal max = std::max(std::max(image.max(0), image.max(1)), image.max(2));
+    ColorVal min = std::min(std::min(image.min(0), image.min(1)), image.min(2));
 
     if (max-min > 255) {
         fprintf(stderr,"Cannot store as PPM. Find out why.\n");
@@ -78,7 +78,7 @@ bool image_save_pnm(const char *filename, const Image& image)
         return false;
     }
 
-    unsigned int height = image(0).height, width = image(0).width;
+    unsigned int height = image.rows(), width = image.cols();
     fprintf(fp,"P6\n%u %u\n%i\n", width, height, max-min);
     for (unsigned int y = 0; y < height; y++) {
         for (unsigned int x = 0; x < width; x++) {

@@ -4,13 +4,13 @@
 #include "image.h"
 #include "image-pnm.h"
 
-void Plane::init(int width, int height, int min, int max)
+void Plane::init(int subwidth, int subheight, int min, int max)
 {
-    this->width = width;
-    this->height = height;
+    this->subwidth = subwidth;
+    this->subheight = subheight;
     this->min = min;
     this->max = max;
-    this->data = std::vector<ColorVal>(width*height, 0);
+    this->data = std::vector<ColorVal>(subwidth*subheight, 0);
 }
 
 bool Image::load(const char *filename)
@@ -47,13 +47,17 @@ bool Image::save(const char *filename) const
     return false;
 }
 
-void Image::add_plane(int width, int height, int min, int max)
+void Image::add_plane(int min, int max, int subSampleR, int subSampleC)
 {
-    planes.push_back(Plane(width, height, min, max));
+    planes.push_back(Plane((width+subSampleR-1)/subSampleR, (height+subSampleC-1)/subSampleC, min, max));
+    subsample.push_back(std::make_pair(subSampleR, subSampleC));
 }
 
 void Image::init(int width, int height, int min, int max, int planes)
 {
     this->planes = std::vector<Plane>(planes, Plane(width, height, min, max));
+    this->width = width;
+    this->height = height;
+    this->subsample = std::vector<std::pair<int,int> >(planes, std::make_pair(1,1));
 }
 
