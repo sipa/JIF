@@ -7,200 +7,207 @@
 #define CONTEXT_TREE_SPLIT_THRESHOLD 1
 // 4 bit improvement needed before splitting
 
-template <typename BitChance> class CompoundSymbolChances {
+template <typename BitChance> class CompoundSymbolChances
+{
 public:
-  SymbolChance<BitChance> realChances;
-  std::vector<std::pair<SymbolChance<BitChance>,SymbolChance<BitChance> > > virtChances;
-  uint64_t realSize;
-  std::vector<uint64_t> virtSize;
-  std::vector<int64_t> virtPropSum;
-  int64_t count;
-  signed short int best_property;
+    SymbolChance<BitChance> realChances;
+    std::vector<std::pair<SymbolChance<BitChance>,SymbolChance<BitChance> > > virtChances;
+    uint64_t realSize;
+    std::vector<uint64_t> virtSize;
+    std::vector<int64_t> virtPropSum;
+    int64_t count;
+    signed short int best_property;
 
-  void resetCounters() {
+    void resetCounters() {
         count = 0;
         best_property = -1;
         realSize = 0;
         virtPropSum.assign(virtPropSum.size(),0);
-  }
+    }
 
-  CompoundSymbolChances(int nProp, int nBits) : realChances(nBits),
-                                                virtChances(nProp,std::make_pair(SymbolChance<BitChance>(nBits), SymbolChance<BitChance>(nBits))),
-                                                realSize(0),
-                                                virtSize(nProp),
-                                                virtPropSum(nProp),
-                                                count(0),
-                                                best_property(-1)
-                                                 { }
+    CompoundSymbolChances(int nProp, int nBits) : realChances(nBits),
+        virtChances(nProp,std::make_pair(SymbolChance<BitChance>(nBits), SymbolChance<BitChance>(nBits))),
+        realSize(0),
+        virtSize(nProp),
+        virtPropSum(nProp),
+        count(0),
+        best_property(-1)
+    { }
 };
 
-template <typename BitChance, typename RAC> class CompoundSymbolBitCoder {
+template <typename BitChance, typename RAC> class CompoundSymbolBitCoder
+{
 private:
-  RAC &rac;
-  CompoundSymbolChances<BitChance> &chances;
-  std::vector<bool> &select;
+    RAC &rac;
+    CompoundSymbolChances<BitChance> &chances;
+    std::vector<bool> &select;
 
-  void inline updateChances(SymbolChanceBitType type, int i, bool bit) {
-    BitChance& real = chances.realChances.bit(type,i);
-    real.estim(bit, chances.realSize);
-    real.put(bit);
+    void inline updateChances(SymbolChanceBitType type, int i, bool bit) {
+        BitChance& real = chances.realChances.bit(type,i);
+        real.estim(bit, chances.realSize);
+        real.put(bit);
 
-    signed short int best_property = -1;
-    uint64_t best_size = chances.realSize;
+        signed short int best_property = -1;
+        uint64_t best_size = chances.realSize;
 //    fprintf(stdout,"RealSize: %lu ||",best_size);
-    for (unsigned int j=0; j<chances.virtChances.size(); j++) {
-      BitChance& virt = (select)[j] ? chances.virtChances[j].first.bit(type,i)
-                                    : chances.virtChances[j].second.bit(type,i);
-      virt.estim(bit, chances.virtSize[j]);
-      virt.put(bit);
-      if (chances.virtSize[j] < best_size) { best_size = chances.virtSize[j]; best_property = j; }
+        for (unsigned int j=0; j<chances.virtChances.size(); j++) {
+            BitChance& virt = (select)[j] ? chances.virtChances[j].first.bit(type,i)
+                              : chances.virtChances[j].second.bit(type,i);
+            virt.estim(bit, chances.virtSize[j]);
+            virt.put(bit);
+            if (chances.virtSize[j] < best_size) {
+                best_size = chances.virtSize[j];
+                best_property = j;
+            }
 //      fprintf(stdout,"Virt(%u)Size: %lu ||",j,chances->virtSize[j]);
-    }
-    chances.best_property = best_property;
+        }
+        chances.best_property = best_property;
 //    fprintf(stdout,"\n");
-  }
-  BitChance inline & bestChance(SymbolChanceBitType type, int i = 0) {
+    }
+    BitChance inline & bestChance(SymbolChanceBitType type, int i = 0) {
         signed short int p = chances.best_property;
         return (p == -1 ? chances.realChances.bit(type,i)
-                        : ((select)[p] ? chances.virtChances[p].first.bit(type,i)
-                                       : chances.virtChances[p].second.bit(type,i) ));
-  }
+                : ((select)[p] ? chances.virtChances[p].first.bit(type,i)
+                   : chances.virtChances[p].second.bit(type,i) ));
+    }
 
 public:
-  CompoundSymbolBitCoder(RAC &racIn, CompoundSymbolChances<BitChance> &chancesIn, std::vector<bool> &selectIn) : rac(racIn), chances(chancesIn), select(selectIn) {}
+    CompoundSymbolBitCoder(RAC &racIn, CompoundSymbolChances<BitChance> &chancesIn, std::vector<bool> &selectIn) : rac(racIn), chances(chancesIn), select(selectIn) {}
 
-  bool read(SymbolChanceBitType type, int i = 0) {
-    BitChance& ch = bestChance(type, i);
-    bool bit = rac.read(ch.get());
-    updateChances(type, i, bit);
+    bool read(SymbolChanceBitType type, int i = 0) {
+        BitChance& ch = bestChance(type, i);
+        bool bit = rac.read(ch.get());
+        updateChances(type, i, bit);
 //    fprintf(stderr,"bit %s%i = %s\n", SymbolChanceBitName[type], i, bit ? "true" : "false");
-    return bit;
-  }
+        return bit;
+    }
 
-  void write(bool bit, SymbolChanceBitType type, int i = 0) {
-    BitChance& ch = bestChance(type, i);
-    rac.write(ch.get(), bit);
-    updateChances(type, i, bit);
+    void write(bool bit, SymbolChanceBitType type, int i = 0) {
+        BitChance& ch = bestChance(type, i);
+        rac.write(ch.get(), bit);
+        updateChances(type, i, bit);
 //    fprintf(stderr,"bit %s%i = %s\n", SymbolChanceBitName[type], i, bit ? "true" : "false");
-  }
+    }
 };
 
-template <typename BitChance, typename RAC> class CompoundSymbolCoder {
+template <typename BitChance, typename RAC> class CompoundSymbolCoder
+{
 private:
-  RAC &rac;
+    RAC &rac;
 public:
-  CompoundSymbolCoder(RAC& racIn) : rac(racIn) {}
+    CompoundSymbolCoder(RAC& racIn) : rac(racIn) {}
 
-  int read_int(CompoundSymbolChances<BitChance> &chancesIn, std::vector<bool> &selectIn, int min, int max) {
-    CompoundSymbolBitCoder<BitChance, RAC> bitCoder(rac, chancesIn, selectIn);
-    return reader(bitCoder, min, max);
-  }
+    int read_int(CompoundSymbolChances<BitChance> &chancesIn, std::vector<bool> &selectIn, int min, int max) {
+        CompoundSymbolBitCoder<BitChance, RAC> bitCoder(rac, chancesIn, selectIn);
+        return reader(bitCoder, min, max);
+    }
 
-  void write_int(CompoundSymbolChances<BitChance>& chancesIn, std::vector<bool> &selectIn, int min, int max, int val) {
-    CompoundSymbolBitCoder<BitChance, RAC> bitCoder(rac, chancesIn, selectIn);
-    writer(bitCoder, min, max, val);
-  }
+    void write_int(CompoundSymbolChances<BitChance>& chancesIn, std::vector<bool> &selectIn, int min, int max, int val) {
+        CompoundSymbolBitCoder<BitChance, RAC> bitCoder(rac, chancesIn, selectIn);
+        writer(bitCoder, min, max, val);
+    }
 };
 
 
 
-class PropertyDecisionNode {
+class PropertyDecisionNode
+{
 public:
-  int property;         // -1 : leaf node, childID refers to leaf_node
-                        // 0..nb_properties-1 : childID refers to left branch  (in inner_node)
-                        //                      childID+1 refers to right branch
-  int splitval;
-  int childID;
-  PropertyDecisionNode(int p=-1, int s=0, int c=0) : property(p), splitval(s), childID(c) {}
+    int property;         // -1 : leaf node, childID refers to leaf_node
+    // 0..nb_properties-1 : childID refers to left branch  (in inner_node)
+    //                      childID+1 refers to right branch
+    int splitval;
+    int childID;
+    PropertyDecisionNode(int p=-1, int s=0, int c=0) : property(p), splitval(s), childID(c) {}
 };
 
-template <typename BitChance, typename RAC> class PropertySymbolCoder {
+template <typename BitChance, typename RAC> class PropertySymbolCoder
+{
 private:
-  CompoundSymbolCoder<BitChance, RAC> coder;
-  std::vector<std::pair<int,int> > range;
-  unsigned int nb_properties;
-  std::vector<CompoundSymbolChances<BitChance> > leaf_node;
-  std::vector<PropertyDecisionNode> inner_node;
-  std::vector<bool> selection;
+    CompoundSymbolCoder<BitChance, RAC> coder;
+    std::vector<std::pair<int,int> > range;
+    unsigned int nb_properties;
+    std::vector<CompoundSymbolChances<BitChance> > leaf_node;
+    std::vector<PropertyDecisionNode> inner_node;
+    std::vector<bool> selection;
 
-  CompoundSymbolChances<BitChance> inline &find_leaf(std::vector<int> &properties) {
-    //std::vector<std:pair<int,int> > current_ranges = range;
-    int pos = 0;
-    while(inner_node[pos].property != -1) {
+    CompoundSymbolChances<BitChance> inline &find_leaf(std::vector<int> &properties) {
+        //std::vector<std:pair<int,int> > current_ranges = range;
+        int pos = 0;
+        while(inner_node[pos].property != -1) {
 //        fprintf(stderr,"Checking property %i (val=%i, splitval=%i)\n",inner_node[pos].property,properties[inner_node[pos].property],inner_node[pos].splitval);
-        if (properties[inner_node[pos].property] > inner_node[pos].splitval) {
+            if (properties[inner_node[pos].property] > inner_node[pos].splitval) {
                 pos = inner_node[pos].childID;
                 //current_ranges[inner_node[pos].property].first = inner_node[pos].splitval + 1;
-        } else {
+            } else {
                 pos = inner_node[pos].childID+1;
                 //current_ranges[inner_node[pos].property].second = inner_node[pos].splitval;
+            }
         }
-    }
 //    fprintf(stdout,"Returning leaf node %i\n", inner_node[pos].childID);
-    CompoundSymbolChances<BitChance> &result = leaf_node[inner_node[pos].childID];
+        CompoundSymbolChances<BitChance> &result = leaf_node[inner_node[pos].childID];
 
-    if(result.best_property != -1 && result.realSize > result.virtSize[result.best_property] + CONTEXT_TREE_SPLIT_THRESHOLD) {
-    // split leaf node if some virtual context is performing (significantly) better
-        int p = result.best_property;
-        int new_inner = inner_node.size();
-        inner_node.push_back(inner_node[pos]);
-        inner_node.push_back(inner_node[pos]);
-        inner_node[pos].splitval = result.virtPropSum[p]/result.count;
-        fprintf(stdout,"Splitting on property %i, splitval=%i (count=%i)\n",p,inner_node[pos].splitval, (int)result.count);
-        inner_node[pos].property = p;
-        int new_leaf = leaf_node.size();
-        result.resetCounters();
-        leaf_node.push_back(CompoundSymbolChances<BitChance>(result));
-        int old_leaf = inner_node[pos].childID;
-        inner_node[pos].childID = new_inner;
-        // should be OK:
-        //inner_node[new_inner].childID = old_leaf;
-        assert(inner_node[new_inner].childID == old_leaf);
-        inner_node[new_inner+1].childID = new_leaf;
-        if (properties[p] > inner_node[pos].splitval) {
+        if(result.best_property != -1 && result.realSize > result.virtSize[result.best_property] + CONTEXT_TREE_SPLIT_THRESHOLD) {
+            // split leaf node if some virtual context is performing (significantly) better
+            int p = result.best_property;
+            int new_inner = inner_node.size();
+            inner_node.push_back(inner_node[pos]);
+            inner_node.push_back(inner_node[pos]);
+            inner_node[pos].splitval = result.virtPropSum[p]/result.count;
+            fprintf(stdout,"Splitting on property %i, splitval=%i (count=%i)\n",p,inner_node[pos].splitval, (int)result.count);
+            inner_node[pos].property = p;
+            int new_leaf = leaf_node.size();
+            result.resetCounters();
+            leaf_node.push_back(CompoundSymbolChances<BitChance>(result));
+            int old_leaf = inner_node[pos].childID;
+            inner_node[pos].childID = new_inner;
+            // should be OK:
+            //inner_node[new_inner].childID = old_leaf;
+            assert(inner_node[new_inner].childID == old_leaf);
+            inner_node[new_inner+1].childID = new_leaf;
+            if (properties[p] > inner_node[pos].splitval) {
                 return leaf_node[old_leaf];
-        } else {
+            } else {
                 return leaf_node[new_leaf];
+            }
         }
+
+
+        return result;
     }
 
-
-    return result;
-  }
-
-  void inline set_selection_and_update_property_sums(std::vector<int> &properties, CompoundSymbolChances<BitChance> &chances) {
-    chances.count++;
-    for(unsigned int i=0; i<nb_properties;i++) {
-        chances.virtPropSum[i] += properties[i];
+    void inline set_selection_and_update_property_sums(std::vector<int> &properties, CompoundSymbolChances<BitChance> &chances) {
+        chances.count++;
+        for(unsigned int i=0; i<nb_properties; i++) {
+            chances.virtPropSum[i] += properties[i];
 //        fprintf(stdout,"Property %i: %i ||",i,properties[i]);
-        selection[i] = (properties[i] > chances.virtPropSum[i]/chances.count);
-    }
+            selection[i] = (properties[i] > chances.virtPropSum[i]/chances.count);
+        }
 //    fprintf(stdout,"\n");
-  }
+    }
 
 public:
-  PropertySymbolCoder(RAC& racIn, std::vector<std::pair<int,int> > &rangeIn, int nBits) :
+    PropertySymbolCoder(RAC& racIn, std::vector<std::pair<int,int> > &rangeIn, int nBits) :
         coder(racIn),
         range(rangeIn),
         nb_properties(range.size()),
         leaf_node(1,CompoundSymbolChances<BitChance>(nb_properties,nBits)),
         inner_node(1,PropertyDecisionNode()),
-        selection(nb_properties,false)
-        {
-        }
+        selection(nb_properties,false) {
+    }
 
-  int read_int(std::vector<int> &properties, int min, int max) {
-    CompoundSymbolChances<BitChance> &chances = find_leaf(properties);
-    set_selection_and_update_property_sums(properties,chances);
-    CompoundSymbolChances<BitChance> &chances2 = find_leaf(properties);
-    return coder.read_int(chances2, selection, min, max);
-  }
+    int read_int(std::vector<int> &properties, int min, int max) {
+        CompoundSymbolChances<BitChance> &chances = find_leaf(properties);
+        set_selection_and_update_property_sums(properties,chances);
+        CompoundSymbolChances<BitChance> &chances2 = find_leaf(properties);
+        return coder.read_int(chances2, selection, min, max);
+    }
 
-  void write_int(std::vector<int> &properties, int min, int max, int val) {
-    CompoundSymbolChances<BitChance> &chances = find_leaf(properties);
-    set_selection_and_update_property_sums(properties,chances);
-    CompoundSymbolChances<BitChance> &chances2 = find_leaf(properties);
-    coder.write_int(chances2, selection, min, max, val);
-  }
+    void write_int(std::vector<int> &properties, int min, int max, int val) {
+        CompoundSymbolChances<BitChance> &chances = find_leaf(properties);
+        set_selection_and_update_property_sums(properties,chances);
+        CompoundSymbolChances<BitChance> &chances2 = find_leaf(properties);
+        coder.write_int(chances2, selection, min, max, val);
+    }
 
 };
