@@ -2,13 +2,14 @@
 #define _IMAGE_H_ 1
 
 #include <vector>
+#include <assert.h>
 
 typedef int ColorVal;
 
 class Plane
 {
 public:
-    unsigned int width, height;
+    int width, height;
     ColorVal min, max;
     std::vector<ColorVal> data;
 
@@ -20,9 +21,12 @@ public:
     }
     void init(int width, int height, ColorVal min, ColorVal max);
     ColorVal &operator()(int r, int c) {
+        assert(!(r >= height || r < 0 || c >= width || c < 0));
         return data[r*width + c];
     }
+
     ColorVal operator()(int r, int c) const {
+        if (r >= height || r < 0 || c >= width || c < 0) return 0;
         return data[r*width + c];
     }
 };

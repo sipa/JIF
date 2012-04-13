@@ -5,7 +5,7 @@
 
 // #define CONTEXT_TREE_SPLIT_THRESHOLD 5461*1
 #define CONTEXT_TREE_SPLIT_THRESHOLD 1
-// 4 bit improvement needed before splitting
+// k bit improvement needed before splitting
 
 template <typename BitChance> class CompoundSymbolChances
 {
@@ -37,7 +37,11 @@ public:
 
 template <typename BitChance, typename RAC> class CompoundSymbolBitCoder
 {
+public:
+    typedef typename BitChance::Table Table;
+
 private:
+    const Table &table;
     RAC &rac;
     CompoundSymbolChances<BitChance> &chances;
     std::vector<bool> &select;
@@ -45,7 +49,7 @@ private:
     void inline updateChances(SymbolChanceBitType type, int i, bool bit) {
         BitChance& real = chances.realChances.bit(type,i);
         real.estim(bit, chances.realSize);
-        real.put(bit);
+        real.put(bit, table);
 
         signed short int best_property = -1;
         uint64_t best_size = chances.realSize;
@@ -54,7 +58,7 @@ private:
             BitChance& virt = (select)[j] ? chances.virtChances[j].first.bit(type,i)
                               : chances.virtChances[j].second.bit(type,i);
             virt.estim(bit, chances.virtSize[j]);
-            virt.put(bit);
+            virt.put(bit, table);
             if (chances.virtSize[j] < best_size) {
                 best_size = chances.virtSize[j];
                 best_property = j;
@@ -72,7 +76,7 @@ private:
     }
 
 public:
-    CompoundSymbolBitCoder(RAC &racIn, CompoundSymbolChances<BitChance> &chancesIn, std::vector<bool> &selectIn) : rac(racIn), chances(chancesIn), select(selectIn) {}
+    CompoundSymbolBitCoder(const Table &tableIn, RAC &racIn, CompoundSymbolChances<BitChance> &chancesIn, std::vector<bool> &selectIn) : table(tableIn), rac(racIn), chances(chancesIn), select(selectIn) {}
 
     bool read(SymbolChanceBitType type, int i = 0) {
         BitChance& ch = bestChance(type, i);
@@ -93,17 +97,21 @@ public:
 template <typename BitChance, typename RAC> class CompoundSymbolCoder
 {
 private:
+    typedef typename CompoundSymbolBitCoder<BitChance, RAC>::Table Table;
     RAC &rac;
+    const Table table;
+
 public:
+
     CompoundSymbolCoder(RAC& racIn) : rac(racIn) {}
 
     int read_int(CompoundSymbolChances<BitChance> &chancesIn, std::vector<bool> &selectIn, int min, int max) {
-        CompoundSymbolBitCoder<BitChance, RAC> bitCoder(rac, chancesIn, selectIn);
+        CompoundSymbolBitCoder<BitChance, RAC> bitCoder(table, rac, chancesIn, selectIn);
         return reader(bitCoder, min, max);
     }
 
     void write_int(CompoundSymbolChances<BitChance>& chancesIn, std::vector<bool> &selectIn, int min, int max, int val) {
-        CompoundSymbolBitCoder<BitChance, RAC> bitCoder(rac, chancesIn, selectIn);
+        CompoundSymbolBitCoder<BitChance, RAC> bitCoder(table, rac, chancesIn, selectIn);
         writer(bitCoder, min, max, val);
     }
 };

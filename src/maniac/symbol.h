@@ -17,6 +17,11 @@ typedef enum {
 
 static const char *SymbolChanceBitName[] = {"zero", "sign", "expo", "mant"};
 
+static const uint16_t EXP_CHANCES[] = {3200, 2800, 2600, 2400, 2000, 1500, 800, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300};
+static const uint16_t MANT_CHANCES[] = {1800, 1800, 1800, 1700, 1600, 1200, 1000, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800};
+static const uint16_t ZERO_CHANCE = 1500;
+static const uint16_t SIGN_CHANCE = 2048;
+
 template <typename BitChance> class SymbolChance
 {
     int bits;
@@ -56,7 +61,18 @@ public:
         }
     }
 
-    SymbolChance(int bitsin) : bits(bitsin), chances(2*bits+1) { }
+
+    SymbolChance(int bitsin) : bits(bitsin), chances(2*bits+1) {
+        bitZero().set(ZERO_CHANCE);
+        bitSign().set(SIGN_CHANCE);
+        for (int i=0; i<bits-1; i++) {
+            bitExp(i).set(EXP_CHANCES[i]);
+        }
+        for (int i=0; i<bits; i++) {
+            bitMant(i).set(MANT_CHANCES[i]);
+        }
+    }
+
 };
 
 template <typename SymbolCoder> int reader(SymbolCoder& coder, int min, int max)
@@ -171,24 +187,27 @@ template <typename SymbolCoder> void writer(SymbolCoder& coder, int min, int max
 
 template <typename BitChance, typename RAC> class SimpleSymbolBitCoder
 {
+    typedef typename BitChance::Table Table;
+
 private:
+    const Table &table;
     SymbolChance<BitChance> &ctx;
     RAC &rac;
 
 public:
-    SimpleSymbolBitCoder(SymbolChance<BitChance> &ctxIn, RAC &racIn) : ctx(ctxIn), rac(racIn) {}
+    SimpleSymbolBitCoder(const Table &tableIn, SymbolChance<BitChance> &ctxIn, RAC &racIn) : table(tableIn), ctx(ctxIn), rac(racIn) {}
 
     void write(bool bit, SymbolChanceBitType typ, int i = 0) {
         BitChance& bch = ctx.bit(typ,i);
         rac.write(bch.get(), bit);
-        bch.put(bit);
+        bch.put(bit, table);
 //    fprintf(stderr,"bit %s%i = %s\n", SymbolChanceBitName[typ], i, bit ? "true" : "false");
     }
 
     bool read(SymbolChanceBitType typ, int i = 0) {
         BitChance& bch = ctx.bit(typ,i);
         bool bit = rac.read(bch.get());
-        bch.put(bit);
+        bch.put(bit, table);
 //    fprintf(stderr,"bit %s%i = %s\n", SymbolChanceBitName[typ], i, bit ? "true" : "false");
         return bit;
     }
@@ -196,20 +215,23 @@ public:
 
 template <typename BitChance, typename RAC> class SimpleSymbolCoder
 {
+    typedef typename BitChance::Table Table;
+
 private:
     SymbolChance<BitChance> ctx;
+    const Table table;
     RAC &rac;
 
 public:
     SimpleSymbolCoder(RAC& racIn, int nBits) : ctx(nBits), rac(racIn) {}
 
     void write_int(int min, int max, int value) {
-        SimpleSymbolBitCoder<BitChance, RAC> bitCoder(ctx, rac);
+        SimpleSymbolBitCoder<BitChance, RAC> bitCoder(table, ctx, rac);
         writer(bitCoder, min, max, value);
     }
 
     int read_int(int min, int max) {
-        SimpleSymbolBitCoder<BitChance, RAC> bitCoder(ctx, rac);
+        SimpleSymbolBitCoder<BitChance, RAC> bitCoder(table, ctx, rac);
         return reader(bitCoder, min, max);
     }
 };

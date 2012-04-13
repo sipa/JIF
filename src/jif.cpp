@@ -8,17 +8,66 @@
 typedef std::vector<std::pair<int,int> > propRanges_t;
 typedef std::vector<int> props_t;
 
-void static initPropRanges(propRanges_t &propRanges)
+void static initPropRanges(propRanges_t &propRanges, const Plane &plane)
 {
     propRanges.clear();
+    int min = plane.min - plane.max;
+    int max = plane.max - plane.min;
+    propRanges.push_back(std::make_pair(plane.min,plane.max));
+    propRanges.push_back(std::make_pair(min,max));
+    propRanges.push_back(std::make_pair(min,max));
+    propRanges.push_back(std::make_pair(min,max));
+    propRanges.push_back(std::make_pair(min,max));
+    propRanges.push_back(std::make_pair(min,max));
+/*
+        properties[5] = quantize_log(UNSTRETCH(left->d[c])-UNSTRETCH(topleft->d[c]),(c==0 ? 255 : 510),SIGNED_LRDIFF,QZ_LRDIFF);
+        properties[6] = quantize_log(UNSTRETCH(topleft->d[c])-UNSTRETCH(top->d[c]),(c==0 ? 255 : 510),SIGNED_LRDIFF,QZ_LRDIFF);
+        properties[7] = quantize_log(UNSTRETCH(top->d[c])-UNSTRETCH(topright->d[c]),(c==0 ? 255 : 510),SIGNED_LRDIFF,QZ_LRDIFF);
+        properties[8] = quantize_log(UNSTRETCH(toptop->d[c])-UNSTRETCH(top->d[c]),(c==0 ? 255 : 510),SIGNED_LRDIFF,QZ_LRDIFF);
+        properties[9] = quantize_log(UNSTRETCH(leftleft->d[c])-UNSTRETCH(left->d[c]),(c==0 ? 255 : 510),SIGNED_LRDIFF,QZ_LRDIFF);
+*/
 }
+
+void static calcProps(props_t &properties, const Plane &plane, int r, int c)
+{
+    properties.push_back(plane(r,c-1)-plane(r-1,c-1));  // left - topleft
+    properties.push_back(plane(r-1,c-1)-plane(r-1,c));  // topleft - top
+    properties.push_back(plane(r-1,c)-plane(r-1,c+1));  // top - topright
+    properties.push_back(plane(r-2,c)-plane(r-1,c));    // toptop - top
+    properties.push_back(plane(r,c-2)-plane(r,c-1));    // leftleft - left
+}
+
+template<typename I> void static swap(I& a, I& b)
+{
+    I c = a;
+    a = b;
+    b = c;
+}
+
+template<typename I> I static median3(I a, I b, I c)
+{
+    if (a<b) swap(a,b);
+    if (b<c) swap(b,c);
+    if (a<b) swap(a,b);
+    return b;
+}
+
+ColorVal static predict(const Plane &plane, int r, int c)
+{
+    ColorVal left = plane(r-1,c);
+    ColorVal top = plane(r,c-1);
+    ColorVal gradient = left + top - plane(r-1,c-1);
+    return median3(left,top,gradient);
+}
+
+typedef MultiscaleBitChance<SimpleBitChance> JifBitChance;
 
 bool encode(const char* filename, const Image &image)
 {
     FILE *f = fopen(filename,"w");
     RacOutput40 rac(f);
 
-    SimpleSymbolCoder<SimpleBitChance, RacOutput40> metaCoder(rac, 24);
+    SimpleSymbolCoder<JifBitChance, RacOutput40> metaCoder(rac, 24);
     int numPlanes = image.numPlanes();
     metaCoder.write_int(1, 16, numPlanes);
     for (int p = 0; p < numPlanes; p++) {
@@ -31,21 +80,23 @@ bool encode(const char* filename, const Image &image)
 
     for (int p = 0; p < image.numPlanes(); p++) {
         const Plane &plane = image(p);
+        printf("Plane #%i: %ix%i [%i..%i]\n", p, plane.width, plane.height, plane.min, plane.max);
         propRanges_t propRanges;
-        initPropRanges(propRanges);
+        initPropRanges(propRanges,plane);
         int nBits = ilog2((plane.max-plane.min)*2-1)+3;
-        PropertySymbolCoder<SimpleBitChance, RacOutput40> coder(rac, propRanges, nBits);
-        ColorVal prev = 0;
-        for (unsigned int r = 0; r < plane.height; r++) {
-            for (unsigned int c = 0; c < plane.width; c++) {
+        PropertySymbolCoder<JifBitChance, RacOutput40> coder(rac, propRanges, nBits);
+        for (int r = 0; r < plane.height; r++) {
+            for (int c = 0; c < plane.width; c++) {
                 props_t properties;
-                ColorVal guess = prev;
+                ColorVal guess = predict(plane,r,c);
+                properties.push_back(guess);
                 ColorVal curr = plane(r,c);
+                calcProps(properties,plane,r,c);
                 coder.write_int(properties, plane.min - guess, plane.max - guess, curr - guess);
 //                fprintf(stderr, "%i(%i,%i)\n", curr - guess, plane.min - guess, plane.max - guess);
-                prev = curr;
             }
         }
+        printf("baldskjd\n");
     }
 
     rac.flush();
@@ -60,7 +111,7 @@ bool decode(const char* filename, Image &image)
     FILE *f = fopen(filename,"r");
     RacInput40 rac(f);
 
-    SimpleSymbolCoder<SimpleBitChance, RacInput40> metaCoder(rac, 24);
+    SimpleSymbolCoder<JifBitChance, RacInput40> metaCoder(rac, 24);
     int numPlanes = metaCoder.read_int(1, 16);
     for (int p = 0; p < numPlanes; p++) {
         int width = metaCoder.read_int(1, 65536);
@@ -74,18 +125,18 @@ bool decode(const char* filename, Image &image)
     for (int p = 0; p < image.numPlanes(); p++) {
         Plane &plane = image(p);
         propRanges_t propRanges;
-        initPropRanges(propRanges);
+        initPropRanges(propRanges,plane);
         int nBits = ilog2((plane.max-plane.min)*2-1)+3;
-        PropertySymbolCoder<SimpleBitChance, RacInput40> coder(rac, propRanges, nBits);
-        ColorVal prev = 0;
-        for (unsigned int r = 0; r < plane.height; r++) {
-            for (unsigned int c = 0; c < plane.width; c++) {
+        PropertySymbolCoder<JifBitChance, RacInput40> coder(rac, propRanges, nBits);
+        for (int r = 0; r < plane.height; r++) {
+            for (int c = 0; c < plane.width; c++) {
                 props_t properties;
-                ColorVal guess = prev;
+                ColorVal guess = predict(plane,r,c);
+                properties.push_back(guess);
+                calcProps(properties,plane,r,c);
                 ColorVal curr = coder.read_int(properties, plane.min - guess, plane.max - guess) + guess;
 //                fprintf(stderr, "%i(%i,%i)\n", curr - guess, plane.min - guess, plane.max - guess);
                 plane(r,c) = curr;
-                prev = curr;
             }
         }
     }
