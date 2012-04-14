@@ -40,6 +40,9 @@ bool Image::save(const char *filename) const
     if (ext && !strcasecmp(ext,".pnm")) {
         return image_save_pnm(filename,*this);
     }
+    if (ext && !strcasecmp(ext,".pgm")) {
+        return image_save_pnm(filename,*this);
+    }
     if (ext && !strcasecmp(ext,".ppm")) {
         return image_save_pnm(filename,*this);
     }
