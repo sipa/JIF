@@ -4,6 +4,46 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+extern const uint16_t log4k[4097];
+extern const int log4k_scale;
+
+class StaticBitChanceTable
+{
+public:
+    StaticBitChanceTable() {};
+};
+
+class StaticBitChance
+{
+protected:
+    uint16_t chance; // stored as a 16-bit number
+
+public:
+    typedef StaticBitChanceTable Table;
+
+    StaticBitChance(int chanceIn = 0x800) {
+        chance = chanceIn;
+    }
+
+    uint16_t inline get() const {
+        return chance * 16; // return 16-bit number
+    }
+
+    void set(uint16_t chanceIn) {
+        chance = chanceIn;
+    }
+
+    void inline put(bool bit, const Table &table) {}
+
+    void estim(bool bit, uint64_t &total) const {
+        total += log4k[bit ? chance : 4096-chance];
+    }
+
+    int scale() const {
+        return log4k_scale;
+    }
+};
+
 void extern build_table(uint16_t *zero_state, uint16_t *one_state, size_t size, int factor, unsigned int max_p);
 
 class SimpleBitChanceTable
@@ -22,10 +62,6 @@ public:
 
 class SimpleBitChance
 {
-private:
-    static const uint16_t log4k[4097];
-    static const int log4k_scale;
-
 protected:
     uint16_t chance; // stored as a 12-bit number
 

@@ -73,7 +73,7 @@ bool encode(const char* filename, Image &image)
     FILE *f = fopen(filename,"w");
     RacOut rac(f);
 
-    SimpleSymbolCoder<SimpleBitChance, RacOut> metaCoder(rac, 24);
+    SimpleSymbolCoder<StaticBitChance, RacOut> metaCoder(rac, 24);
     int numPlanes = image.numPlanes();
     metaCoder.write_int(1, 16, numPlanes);
     metaCoder.write_int(1, 65536, image.cols());
@@ -150,7 +150,7 @@ bool decode(const char* filename, Image &image)
     FILE *f = fopen(filename,"r");
     RacIn rac(f);
 
-    SimpleSymbolCoder<SimpleBitChance, RacIn> metaCoder(rac, 24);
+    SimpleSymbolCoder<StaticBitChance, RacIn> metaCoder(rac, 24);
     int numPlanes = metaCoder.read_int(1, 16);
     int width = metaCoder.read_int(1, 65536);
     int height = metaCoder.read_int(1, 65536);

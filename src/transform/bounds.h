@@ -37,7 +37,7 @@ protected:
 public:
 
     bool initFromImage(Image& image, RacOut &rac, const ColorRanges *srcRanges, const ColorRanges *&dstRanges) {
-        SimpleSymbolCoder<SimpleBitChance, RacOut> coder(rac, 24);
+        SimpleSymbolCoder<StaticBitChance, RacOut> coder(rac, 24);
         bounds.clear();
         for (int p=0; p<image.numPlanes(); p++) {
             ColorVal min = srcRanges->max(p);
@@ -58,7 +58,7 @@ public:
     }
 
     bool initFromRac(Image& image, RacIn &rac, const ColorRanges *srcRanges, const ColorRanges *&dstRanges) {
-        SimpleSymbolCoder<SimpleBitChance, RacIn> coder(rac, 24);
+        SimpleSymbolCoder<StaticBitChance, RacIn> coder(rac, 24);
         bounds.clear();
         for (int p=0; p<image.numPlanes(); p++) {
             ColorVal min = coder.read_int(0, srcRanges->max(p) - srcRanges->min(p)) + srcRanges->min(p);

@@ -43,7 +43,7 @@ void build_table(uint16_t *zero_state, uint16_t *one_state, size_t size, int fac
       } */
 }
 
-const uint16_t SimpleBitChance::log4k[4097] = { 0
+const uint16_t log4k[4097] = { 0
         ,65535,60074,56879,54613,52854,51418,50203,49151,48223,47393,46642,45957
         ,45326,44742,44198,43690,43212,42762,42336,41932,41547,41181,40831,40495
         ,40174,39865,39567,39281,39004,38737,38479,38229,37986,37751,37523,37301
@@ -388,4 +388,4 @@ const uint16_t SimpleBitChance::log4k[4097] = { 0
         ,    6,    4,    2,    0
                                               };
 
-const int SimpleBitChance::log4k_scale = 5461;
+const int log4k_scale = 5461;
