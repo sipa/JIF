@@ -21,7 +21,18 @@ public:
 
 class TransformYIQ : public Transform {
 protected:
-    bool data(Image& image) {
+    bool meta(Image& image, const ColorRanges *srcRanges, const ColorRanges *&dstRanges) {
+        if (image.numPlanes() != 3) return false;
+        if (srcRanges->min(0) < 0 || srcRanges->max(0) > 255) return false;
+        if (srcRanges->min(1) < 0 || srcRanges->max(1) > 255) return false;
+        if (srcRanges->min(2) < 0 || srcRanges->max(2) > 255) return false;
+
+        dstRanges = new ColorRangesYIQ(image);
+        return true;
+    }
+
+public:
+    void data(Image& image) {
         for (int r=0; r<image.rows(); r++) {
             for (int c=0; c<image.cols(); c++) {
                 int R=image(0,r,c), G=image(1,r,c), B=image(2,r,c);
@@ -33,25 +44,9 @@ protected:
                 image(2,r,c) = Q;
             }
         }
-        return true;
     }
 
-public:
-//    bool full(Image& image, const ColorRanges *srcRanges, const ColorRanges& *dstRanges) {
-//        return (meta(srcRanges, image, dstRanges) && data(image));
-//    }
-
-    bool meta(Image& image, const ColorRanges *srcRanges, const ColorRanges *&dstRanges) {
-        if (image.numPlanes() != 3) return false;
-        if (srcRanges->min(0) < 0 || srcRanges->max(0) > 255) return false;
-        if (srcRanges->min(1) < 0 || srcRanges->max(1) > 255) return false;
-        if (srcRanges->min(2) < 0 || srcRanges->max(2) > 255) return false;
-
-        dstRanges = new ColorRangesYIQ(image);
-        return true;
-    }
-
-    bool invData(Image& image) {
+    void invData(Image& image) {
         for (int r=0; r<image.rows(); r++) {
             for (int c=0; c<image.cols(); c++) {
                 int Y=image(0,r,c), I=image(1,r,c), Q=image(2,r,c);
@@ -63,7 +58,6 @@ public:
                 image(2,r,c) = B;
             }
         }
-        return true;
     }
 };
 

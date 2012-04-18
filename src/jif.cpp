@@ -6,6 +6,7 @@
 #include "image/image.h"
 #include "image/color_range.h"
 #include "transform/yiq.h"
+#include "transform/bounds.h"
 
 typedef std::vector<std::pair<int,int> > propRanges_t;
 typedef std::vector<int> props_t;
@@ -70,9 +71,9 @@ typedef MultiscaleBitChance<3,SimpleBitChance> JifBitChance;
 bool encode(const char* filename, Image &image)
 {
     FILE *f = fopen(filename,"w");
-    RacOutput40 rac(f);
+    RacOut rac(f);
 
-    SimpleSymbolCoder<JifBitChance, RacOutput40> metaCoder(rac, 24);
+    SimpleSymbolCoder<SimpleBitChance, RacOut> metaCoder(rac, 24);
     int numPlanes = image.numPlanes();
     metaCoder.write_int(1, 16, numPlanes);
     metaCoder.write_int(1, 65536, image.cols());
@@ -87,24 +88,25 @@ bool encode(const char* filename, Image &image)
     std::vector<const ColorRanges*> rangesList;
     std::vector<Transform*> transforms;
     rangesList.push_back(getRanges(image));
-    for (int i=0; i<1; i++) {
-        Transform *trans = new TransformYIQ();
+    for (int i=0; i<2; i++) {
+        Transform *trans = i==0 ? (Transform*)(new TransformYIQ()) : (Transform*)(new TransformBounds());
         const ColorRanges* rangesNew;
-        if (!trans->full(image, rangesList[i], rangesNew)) {
+        if (!trans->initFromImage(image, rac, rangesList[i], rangesNew)) {
             fprintf(stderr, "Transform failed! Oh noes!\n");
             return false;
         }
+        trans->data(image);
         rangesList.push_back(rangesNew);
         transforms.push_back(trans);
     }
     const ColorRanges* ranges = rangesList[1];
 
-    std::vector<PropertySymbolCoder<JifBitChance, RacOutput40>*> coders;
+    std::vector<PropertySymbolCoder<JifBitChance, RacOut>*> coders;
     for (int p = 0; p < image.numPlanes(); p++) {
         propRanges_t propRanges;
         initPropRanges(propRanges, *ranges, p);
         int nBits = ilog2((ranges->max(p) - ranges->min(p))*2-1)+1;
-        coders.push_back(new PropertySymbolCoder<JifBitChance, RacOutput40>(rac, propRanges, nBits));
+        coders.push_back(new PropertySymbolCoder<JifBitChance, RacOut>(rac, propRanges, nBits));
     }
 
     for (int r = 0; r < image.rows(); r++) {
@@ -146,9 +148,9 @@ bool decode(const char* filename, Image &image)
     image.reset();
 
     FILE *f = fopen(filename,"r");
-    RacInput40 rac(f);
+    RacIn rac(f);
 
-    SimpleSymbolCoder<JifBitChance, RacInput40> metaCoder(rac, 24);
+    SimpleSymbolCoder<SimpleBitChance, RacIn> metaCoder(rac, 24);
     int numPlanes = metaCoder.read_int(1, 16);
     int width = metaCoder.read_int(1, 65536);
     int height = metaCoder.read_int(1, 65536);
@@ -164,10 +166,10 @@ bool decode(const char* filename, Image &image)
     std::vector<const ColorRanges*> rangesList;
     std::vector<Transform*> transforms;
     rangesList.push_back(getRanges(image));
-    for (int i=0; i<1; i++) {
-        Transform *trans = new TransformYIQ();
+    for (int i=0; i<2; i++) {
+        Transform *trans = i==0 ? (Transform*)(new TransformYIQ()) : (Transform*)(new TransformBounds());
         const ColorRanges* rangesNew;
-        if (!trans->meta(image, rangesList[i], rangesNew)) {
+        if (!trans->initFromRac(image, rac, rangesList[i], rangesNew)) {
             fprintf(stderr, "Transform failed! Oh noes!\n");
             return false;
         }
@@ -176,12 +178,12 @@ bool decode(const char* filename, Image &image)
     }
     const ColorRanges* ranges = rangesList[1];
 
-    std::vector<PropertySymbolCoder<JifBitChance, RacInput40>*> coders;
+    std::vector<PropertySymbolCoder<JifBitChance, RacIn>*> coders;
     for (int p = 0; p < image.numPlanes(); p++) {
         propRanges_t propRanges;
         initPropRanges(propRanges, *ranges, p);
         int nBits = ilog2((ranges->max(p) - ranges->min(p))*2-1)+1;
-        coders.push_back(new PropertySymbolCoder<JifBitChance, RacInput40>(rac, propRanges, nBits));
+        coders.push_back(new PropertySymbolCoder<JifBitChance, RacIn>(rac, propRanges, nBits));
     }
 
     for (int r = 0; r < image.rows(); r++) {

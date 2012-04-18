@@ -1,3 +1,6 @@
+#ifndef _RAC_H_
+#define _RAC_H_ 1
+
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
@@ -177,3 +180,5 @@ class RacOutput40 : public RacOutput<RacConfig40, RacFileIO>
 public:
     RacOutput40(FILE *file) : RacOutput<RacConfig40, RacFileIO>(RacFileIO(file)) { }
 };
+
+#endif
