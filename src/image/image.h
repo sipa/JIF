@@ -92,14 +92,6 @@ public:
         return planes[p].max;
     }
 
-    int min(int p, int r, int c) const {
-        return min(p);
-    }
-
-    int max(int p, int r, int c) const {
-        return max(p);
-    }
-
     int rows() const {
         return height;
     }

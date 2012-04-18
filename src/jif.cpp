@@ -4,21 +4,23 @@
 #include "maniac/util.h"
 
 #include "image/image.h"
+#include "image/color_range.h"
+#include "transform/yiq.h"
 
 typedef std::vector<std::pair<int,int> > propRanges_t;
 typedef std::vector<int> props_t;
 
-void static initPropRanges(propRanges_t &propRanges, const Image &image, int p)
+void static initPropRanges(propRanges_t &propRanges, const ColorRanges &ranges, int p)
 {
     propRanges.clear();
-    int min = image.min(p);
-    int max = image.max(p);
+    int min = ranges.min(p);
+    int max = ranges.max(p);
     int mind = min - max, maxd = max - min;
 
     propRanges.push_back(std::make_pair(min,max));
 
     for (int pp = 0; pp < p; pp++) {
-        propRanges.push_back(std::make_pair(image.min(pp), image.max(pp)));
+        propRanges.push_back(std::make_pair(ranges.min(pp), ranges.max(pp)));
     }
     propRanges.push_back(std::make_pair(mind,maxd));
     propRanges.push_back(std::make_pair(mind,maxd));
@@ -65,7 +67,7 @@ ColorVal static predict(const Image &image, int p, int r, int c)
 
 typedef MultiscaleBitChance<3,SimpleBitChance> JifBitChance;
 
-bool encode(const char* filename, const Image &image)
+bool encode(const char* filename, Image &image)
 {
     FILE *f = fopen(filename,"w");
     RacOutput40 rac(f);
@@ -82,11 +84,26 @@ bool encode(const char* filename, const Image &image)
         metaCoder.write_int(0, 16777216, image.max(p) - image.min(p));
     }
 
+    std::vector<const ColorRanges*> rangesList;
+    std::vector<Transform*> transforms;
+    rangesList.push_back(getRanges(image));
+    for (int i=0; i<1; i++) {
+        Transform *trans = new TransformYIQ();
+        const ColorRanges* rangesNew;
+        if (!trans->full(image, rangesList[i], rangesNew)) {
+            fprintf(stderr, "Transform failed! Oh noes!\n");
+            return false;
+        }
+        rangesList.push_back(rangesNew);
+        transforms.push_back(trans);
+    }
+    const ColorRanges* ranges = rangesList[1];
+
     std::vector<PropertySymbolCoder<JifBitChance, RacOutput40>*> coders;
     for (int p = 0; p < image.numPlanes(); p++) {
         propRanges_t propRanges;
-        initPropRanges(propRanges,image,p);
-        int nBits = ilog2((image.max(p)-image.min(p))*2-1)+1;
+        initPropRanges(propRanges, *ranges, p);
+        int nBits = ilog2((ranges->max(p) - ranges->min(p))*2-1)+1;
         coders.push_back(new PropertySymbolCoder<JifBitChance, RacOutput40>(rac, propRanges, nBits));
     }
 
@@ -100,7 +117,7 @@ bool encode(const char* filename, const Image &image)
                     properties.push_back(guess);
                     ColorVal curr = image(p,r,c);
                     calcProps(properties,image,p,r,c);
-                    coders[p]->write_int(properties, image.min(p,r,c) - guess, image.max(p,r,c) - guess, curr - guess);
+                    coders[p]->write_int(properties, ranges->min(p,r,c) - guess, ranges->max(p,r,c) - guess, curr - guess);
                 }
             }
         }
@@ -109,7 +126,16 @@ bool encode(const char* filename, const Image &image)
     for (int p = 0; p < image.numPlanes(); p++) {
         delete coders[p];
     }
- 
+
+    for (int i=transforms.size()-1; i>=0; i--) {
+        delete transforms[i];
+    }
+    transforms.clear();
+    for (unsigned int i=0; i<rangesList.size(); i++) {
+        delete rangesList[i];
+    }
+    rangesList.clear();
+
     rac.flush();
     fclose(f);
     return true;
@@ -135,11 +161,26 @@ bool decode(const char* filename, Image &image)
         image.add_plane(min, max, subSampleR, subSampleC);
     }
 
+    std::vector<const ColorRanges*> rangesList;
+    std::vector<Transform*> transforms;
+    rangesList.push_back(getRanges(image));
+    for (int i=0; i<1; i++) {
+        Transform *trans = new TransformYIQ();
+        const ColorRanges* rangesNew;
+        if (!trans->meta(image, rangesList[i], rangesNew)) {
+            fprintf(stderr, "Transform failed! Oh noes!\n");
+            return false;
+        }
+        rangesList.push_back(rangesNew);
+        transforms.push_back(trans);
+    }
+    const ColorRanges* ranges = rangesList[1];
+
     std::vector<PropertySymbolCoder<JifBitChance, RacInput40>*> coders;
     for (int p = 0; p < image.numPlanes(); p++) {
         propRanges_t propRanges;
-        initPropRanges(propRanges,image,p);
-        int nBits = ilog2((image.max(p)-image.min(p))*2-1)+1;
+        initPropRanges(propRanges, *ranges, p);
+        int nBits = ilog2((ranges->max(p) - ranges->min(p))*2-1)+1;
         coders.push_back(new PropertySymbolCoder<JifBitChance, RacInput40>(rac, propRanges, nBits));
     }
 
@@ -151,12 +192,27 @@ bool decode(const char* filename, Image &image)
                     ColorVal guess = predict(image,p,r,c);
                     properties.push_back(guess);
                     calcProps(properties,image,p,r,c);
-                    ColorVal curr = coders[p]->read_int(properties, image.min(p,r,c) - guess, image.max(p,r,c) - guess) + guess;
+                    ColorVal curr = coders[p]->read_int(properties, ranges->min(p,r,c) - guess, ranges->max(p,r,c) - guess) + guess;
                     image(p,r,c) = curr;
                 }
             }
         }
     }
+
+
+    for (int p = 0; p < image.numPlanes(); p++) {
+        delete coders[p];
+    }
+
+    for (int i=transforms.size()-1; i>=0; i--) {
+        transforms[i]->invData(image);
+        delete transforms[i];
+    }
+    transforms.clear();
+    for (unsigned int i=0; i<rangesList.size(); i++) {
+        delete rangesList[i];
+    }
+    rangesList.clear();
 
     fclose(f);
     return true;
