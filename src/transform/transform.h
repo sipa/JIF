@@ -15,6 +15,10 @@ protected:
         return true;
     }
 
+    void virtual load(const ColorRanges *srcRanges, RacIn &rac) {};
+    void virtual process(const ColorRanges *srcRanges, Image &image) {};
+    void virtual save(const ColorRanges *srcRanges, RacOut &rac) {};
+
 public:
     virtual ~Transform() {};
 
@@ -22,10 +26,13 @@ public:
     void virtual invData(Image& image) {}
 
     bool virtual initFromImage(Image &image, RacOut& rac, const ColorRanges *srcRanges, const ColorRanges *&dstRanges) {
+        process(srcRanges, image);
+        save(srcRanges, rac);
         return meta(image, srcRanges, dstRanges);
     }
 
     bool virtual initFromRac(Image &image, RacIn& rac, const ColorRanges *srcRanges, const ColorRanges *&dstRanges) {
+        load(srcRanges, rac);
         return meta(image, srcRanges, dstRanges);
     }
 };

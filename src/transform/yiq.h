@@ -12,6 +12,7 @@ protected:
 public:
     ColorRangesYIQ(Image &imageIn) : image(&imageIn) {}
     bool isStatic() const { return false; }
+    int numPlanes() const { return 3; }
     ColorVal min(int p) const { return 0; }
     ColorVal max(int p) const { switch(p) { case 0: return 255; case 1: return 510; case 2: return 510; }; assert(false); return 0; }
     ColorVal min(int p, int r, int c) const;
