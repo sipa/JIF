@@ -4,5 +4,5 @@
 bool encode(const char* filename, const Image &image);
 bool decode(const char* filename, Image &image);
 
-
 #endif
+

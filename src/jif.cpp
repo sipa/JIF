@@ -63,29 +63,25 @@ typedef MultiscaleBitChance<3,SimpleBitChance> JifBitChance;
 
 template<typename RAC> void static write_name(RAC& rac, std::string str)
 {
-    SimpleSymbolCoder<StaticBitChance,RAC> coder(rac, 8);
-    coder.write_int(0, 4, str.size() - 4);
-    int p = 0;
+    UniformSymbolCoder<RAC> coder(rac);
+    coder.write_int(3, 8, str.size());
     for (unsigned int i=0; i<str.size(); i++) {
         char c = str[i];
         int n = ((c >= 'A' && c <= 'Z') ? c - 'A' :
                 ((c >= 'a' && c <= 'z') ? c - 'a' :
                 ((c >= '0' && c <= '9') ? c - '0' + 26 : 35)));
-        coder.write_int(0 - p, 35 - p, n - p);
-        p = n;
+        coder.write_int(0, 35, n);
     }
 }
 
 template<typename RAC> std::string static read_name(RAC& rac)
 {
     static char cs[] = "ABCDEFGHIJKLMOPQRSTUVWXYZ0123456789_";
-    SimpleSymbolCoder<StaticBitChance,RAC> coder(rac, 8);
-    int l = coder.read_int(0, 4) + 4;
-    int p = 0;
+    UniformSymbolCoder<RAC> coder(rac);
+    int l = coder.read_int(3, 8);
     std::string str;
     for (int i=0; i<l; i++) {
-        int n = coder.read_int(0 - p, 35 - p) + p;
-        p = n;
+        int n = coder.read_int(0, 35);
         str += cs[n];
     }
     return str;
@@ -106,7 +102,7 @@ bool encode(const char* filename, Image &image)
 
     write_name(rac, "RAC1");
 
-    SimpleSymbolCoder<StaticBitChance, RacOut> metaCoder(rac, 24);
+    SimpleSymbolCoder<SimpleBitChance, RacOut> metaCoder(rac, 24);
     int numPlanes = image.numPlanes();
     metaCoder.write_int(1, 16, numPlanes);
     metaCoder.write_int(1, 65536, image.cols());
@@ -189,7 +185,7 @@ bool decode(const char* filename, Image &image)
         return false;
     }
 
-    SimpleSymbolCoder<StaticBitChance, RacIn> metaCoder(rac, 24);
+    SimpleSymbolCoder<SimpleBitChance, RacIn> metaCoder(rac, 24);
     int numPlanes = metaCoder.read_int(1, 16);
     int width = metaCoder.read_int(1, 65536);
     int height = metaCoder.read_int(1, 65536);

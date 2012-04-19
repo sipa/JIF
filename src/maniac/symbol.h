@@ -8,6 +8,52 @@
 #include "util.h"
 #include "chance.h"
 
+template <typename RAC> class UniformSymbolCoder
+{
+private:
+    RAC &rac;
+
+public:
+    UniformSymbolCoder(RAC &racIn) : rac(racIn) { }
+
+    void write_int(int min, int max, int val) {
+        assert(max >= min);
+        if (min != 0) {
+            max -= min;
+            val -= min;
+        }
+        if (max == 0) return;
+
+        // split in [0..med] [med+1..max]
+        int med = max/2;
+        if (val > med) {
+            rac.write(med+1, max+1, true);
+            write_int(med+1, max, val);
+        } else {
+            rac.write(med+1, max+1, false);
+            write_int(0, med, val);
+        }
+        return;
+    }
+
+    int read_int(int min, int max) {
+        assert(max >= min);
+        if (min != 0) {
+            max -= min;
+        }
+        if (max == 0) return min;
+
+        // split in [0..med] [med+1..max]
+        int med = max/2;
+        bool bit = rac.read(med+1, max+1);
+        if (bit) {
+            return read_int(min+med+1, min+max);
+        } else {
+            return read_int(min, min+med);
+        }
+    }
+};
+
 typedef enum {
     BIT_ZERO,
     BIT_SIGN,
