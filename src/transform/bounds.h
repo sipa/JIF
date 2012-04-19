@@ -27,6 +27,7 @@ protected:
     std::vector<std::pair<ColorVal, ColorVal> > bounds;
 
     bool meta(Image& image, const ColorRanges *srcRanges, const ColorRanges *&dstRanges) {
+        fprintf(stderr,"TransformBounds::meta\n");
         if (srcRanges->isStatic()) {
             dstRanges = new StaticColorRanges(bounds);
         } else {

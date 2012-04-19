@@ -9,12 +9,13 @@ class ColorRangesYIQ : public ColorRanges
 {
 protected:
     const Image *image;
+    int par; // range: [0..4*par-1]
 public:
-    ColorRangesYIQ(Image &imageIn) : image(&imageIn) {}
+    ColorRangesYIQ(Image &imageIn, int parIn) : image(&imageIn), par(parIn) {}
     bool isStatic() const { return false; }
     int numPlanes() const { return 3; }
     ColorVal min(int p) const { return 0; }
-    ColorVal max(int p) const { switch(p) { case 0: return 255; case 1: return 510; case 2: return 510; }; assert(false); return 0; }
+    ColorVal max(int p) const { switch(p) { case 0: return 4*par-1; case 1: return 8*par-2; case 2: return 8*par-2; }; assert(false); return 0; }
     ColorVal min(int p, int r, int c) const;
     ColorVal max(int p, int r, int c) const;
 };
@@ -22,24 +23,27 @@ public:
 
 class TransformYIQ : public Transform {
 protected:
+    int par;
+
     bool meta(Image& image, const ColorRanges *srcRanges, const ColorRanges *&dstRanges) {
         if (image.numPlanes() != 3) return false;
-        if (srcRanges->min(0) < 0 || srcRanges->max(0) > 255) return false;
-        if (srcRanges->min(1) < 0 || srcRanges->max(1) > 255) return false;
-        if (srcRanges->min(2) < 0 || srcRanges->max(2) > 255) return false;
+        int max = std::max(std::max(srcRanges->max(0), srcRanges->max(1)), srcRanges->max(2));
+        par = max/4+1;
+        printf("TransformYIQ::meta: par=%i\n", par);
 
-        dstRanges = new ColorRangesYIQ(image);
+        dstRanges = new ColorRangesYIQ(image, par);
         return true;
     }
 
 public:
     void data(Image& image) {
+        printf("TransformYIQ::data: par=%i\n", par);
         for (int r=0; r<image.rows(); r++) {
             for (int c=0; c<image.cols(); c++) {
                 int R=image(0,r,c), G=image(1,r,c), B=image(2,r,c);
                 int Y = ((R + B) / 2 + G) / 2;
-                int I = R - B + 255;
-                int Q = (R + B) / 2 - G + 255;
+                int I = R - B + par*4 - 1;
+                int Q = (R + B) / 2 - G + par*4 - 1;
                 image(0,r,c) = Y;
                 image(1,r,c) = I;
                 image(2,r,c) = Q;
@@ -51,8 +55,8 @@ public:
         for (int r=0; r<image.rows(); r++) {
             for (int c=0; c<image.cols(); c++) {
                 int Y=image(0,r,c), I=image(1,r,c), Q=image(2,r,c);
-                int R = Y + (Q + 2) / 2 + (I + 2) / 2 - 256;
-                int G = Y - (Q + 1) / 2 + 128;
+                int R = Y + (Q + 2) / 2 + (I + 2) / 2 - 4*par;
+                int G = Y - (Q + 1) / 2 + 2*par;
                 int B = Y + (Q + 2) / 2 - (I + 1) / 2;
                 image(0,r,c) = R;
                 image(1,r,c) = G;
