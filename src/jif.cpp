@@ -1,3 +1,4 @@
+#include <string>
 
 #include "maniac/rac.h"
 #include "maniac/compound.h"
@@ -58,6 +59,38 @@ template<typename I> I static median3(I a, I b, I c)
     return b;
 }
 
+typedef MultiscaleBitChance<3,SimpleBitChance> JifBitChance;
+
+template<typename RAC> void static write_name(RAC& rac, std::string str)
+{
+    SimpleSymbolCoder<StaticBitChance,RAC> coder(rac, 8);
+    coder.write_int(0, 4, str.size() - 4);
+    int p = 0;
+    for (unsigned int i=0; i<str.size(); i++) {
+        char c = str[i];
+        int n = ((c >= 'A' && c <= 'Z') ? c - 'A' :
+                ((c >= 'a' && c <= 'z') ? c - 'a' :
+                ((c >= '0' && c <= '9') ? c - '0' + 26 : 35)));
+        coder.write_int(0 - p, 35 - p, n - p);
+        p = n;
+    }
+}
+
+template<typename RAC> std::string static read_name(RAC& rac)
+{
+    static char cs[] = "ABCDEFGHIJKLMOPQRSTUVWXYZ0123456789_";
+    SimpleSymbolCoder<StaticBitChance,RAC> coder(rac, 8);
+    int l = coder.read_int(0, 4) + 4;
+    int p = 0;
+    std::string str;
+    for (int i=0; i<l; i++) {
+        int n = coder.read_int(0 - p, 35 - p) + p;
+        p = n;
+        str += cs[n];
+    }
+    return str;
+}
+
 ColorVal static predict(const Image &image, int p, int r, int c)
 {
     ColorVal left = image(p,r-1,c);
@@ -66,12 +99,12 @@ ColorVal static predict(const Image &image, int p, int r, int c)
     return median3(left,top,gradient);
 }
 
-typedef MultiscaleBitChance<3,SimpleBitChance> JifBitChance;
-
 bool encode(const char* filename, Image &image)
 {
     FILE *f = fopen(filename,"w");
     RacOut rac(f);
+
+    write_name(rac, "RAC1");
 
     SimpleSymbolCoder<StaticBitChance, RacOut> metaCoder(rac, 24);
     int numPlanes = image.numPlanes();
@@ -149,6 +182,12 @@ bool decode(const char* filename, Image &image)
 
     FILE *f = fopen(filename,"r");
     RacIn rac(f);
+
+    std::string str = read_name(rac);
+    if (str != "RAC1") {
+        fprintf(stderr,"Unknown magic '%s'\n", str.c_str());
+        return false;
+    }
 
     SimpleSymbolCoder<StaticBitChance, RacIn> metaCoder(rac, 24);
     int numPlanes = metaCoder.read_int(1, 16);
