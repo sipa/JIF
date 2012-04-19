@@ -47,7 +47,7 @@ protected:
         }
     }
 
-    void save(const ColorRanges *srcRanges, RacOut &rac) {
+    void save(const ColorRanges *srcRanges, RacOut &rac) const {
         SimpleSymbolCoder<StaticBitChance, RacOut> coder(rac, 24);
         for (int p=0; p<srcRanges->numPlanes(); p++) {
             ColorVal min = bounds[p].first;
@@ -58,7 +58,7 @@ protected:
         }
     }
 
-    void process(const ColorRanges *srcRanges, Image &image) {
+    void process(const ColorRanges *srcRanges, const Image &image) {
         bounds.clear();
         for (int p=0; p<srcRanges->numPlanes(); p++) {
             ColorVal min = srcRanges->max(p);

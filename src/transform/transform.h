@@ -16,14 +16,14 @@ protected:
     }
 
     void virtual load(const ColorRanges *srcRanges, RacIn &rac) {};
-    void virtual process(const ColorRanges *srcRanges, Image &image) {};
-    void virtual save(const ColorRanges *srcRanges, RacOut &rac) {};
+    void virtual process(const ColorRanges *srcRanges, const Image &image) {};
+    void virtual save(const ColorRanges *srcRanges, RacOut &rac) const {};
 
 public:
     virtual ~Transform() {};
 
-    void virtual data(Image& image) {}
-    void virtual invData(Image& image) {}
+    void virtual data(Image& image) const {}
+    void virtual invData(Image& image) const {}
 
     bool virtual initFromImage(Image &image, RacOut& rac, const ColorRanges *srcRanges, const ColorRanges *&dstRanges) {
         process(srcRanges, image);

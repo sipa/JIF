@@ -36,7 +36,7 @@ protected:
     }
 
 public:
-    void data(Image& image) {
+    void data(Image& image) const {
         printf("TransformYIQ::data: par=%i\n", par);
         for (int r=0; r<image.rows(); r++) {
             for (int c=0; c<image.cols(); c++) {
@@ -51,7 +51,7 @@ public:
         }
     }
 
-    void invData(Image& image) {
+    void invData(Image& image) const {
         for (int r=0; r<image.rows(); r++) {
             for (int c=0; c<image.cols(); c++) {
                 int Y=image(0,r,c), I=image(1,r,c), Q=image(2,r,c);
