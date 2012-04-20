@@ -69,19 +69,19 @@ template<typename RAC> void static write_name(RAC& rac, std::string str)
         char c = str[i];
         int n = ((c >= 'A' && c <= 'Z') ? c - 'A' :
                 ((c >= 'a' && c <= 'z') ? c - 'a' :
-                ((c >= '0' && c <= '9') ? c - '0' + 26 : 35)));
-        coder.write_int(0, 35, n);
+                ((c >= '0' && c <= '9') ? c - '0' + 26 : 36)));
+        coder.write_int(0, 36, n);
     }
 }
 
 template<typename RAC> std::string static read_name(RAC& rac)
 {
-    static char cs[] = "ABCDEFGHIJKLMOPQRSTUVWXYZ0123456789_";
+    static char cs[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
     UniformSymbolCoder<RAC> coder(rac);
     int l = coder.read_int(3, 8);
     std::string str;
     for (int i=0; i<l; i++) {
-        int n = coder.read_int(0, 35);
+        int n = coder.read_int(0, 36);
         str += cs[n];
     }
     return str;
@@ -95,12 +95,13 @@ ColorVal static predict(const Image &image, int p, int r, int c)
     return median3(left,top,gradient);
 }
 
+
 bool encode(const char* filename, Image &image)
 {
     FILE *f = fopen(filename,"w");
     RacOut rac(f);
 
-    write_name(rac, "RAC1");
+    write_name(rac, "JIF1");
 
     SimpleSymbolCoder<SimpleBitChance, RacOut> metaCoder(rac, 24);
     int numPlanes = image.numPlanes();
@@ -155,6 +156,8 @@ bool encode(const char* filename, Image &image)
     }
 
     for (int p = 0; p < image.numPlanes(); p++) {
+//        fprintf(stdout,"Coder for plane %i:\n",p);
+//        coders[p]->write_tree();
         delete coders[p];
     }
 
@@ -180,7 +183,7 @@ bool decode(const char* filename, Image &image)
     RacIn rac(f);
 
     std::string str = read_name(rac);
-    if (str != "RAC1") {
+    if (str != "JIF1") {
         fprintf(stderr,"Unknown magic '%s'\n", str.c_str());
         return false;
     }
