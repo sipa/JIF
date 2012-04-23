@@ -24,7 +24,7 @@ public:
     void init(int subwidth, int subheight, ColorVal min, ColorVal max);
 
     ColorVal &operator()(int subr, int subc) {
-        assert(!(subr >= subheight || subr < 0 || subc >= subwidth || c < 0));
+        assert(!(subr >= subheight || subr < 0 || subc >= subwidth || subc < 0));
         return data[subr*subwidth + subc];
     }
 

@@ -171,8 +171,9 @@ public:
 
 class RacDummyIO
 {
-    void write(int byte) {}
-    void flush() {}
+public:
+    void inline write(int byte) {}
+    void inline flush() {}
 };
 
 class RacInput40 : public RacInput<RacConfig40, RacFileIO>
@@ -186,7 +187,7 @@ class RacOutput40 : public RacOutput<RacConfig40, RacFileIO>
 public:
     RacOutput40(FILE *file) : RacOutput<RacConfig40, RacFileIO>(RacFileIO(file)) { }
     typedef RacOutput<RacConfig40, RacDummyIO> Dummy;
-    Dummy *getDummy() { return new Dummy(RacDummyIO()); }
+    Dummy get_dummy() { return Dummy(RacDummyIO()); }
 };
 
 #endif

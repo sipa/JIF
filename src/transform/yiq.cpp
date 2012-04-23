@@ -11,8 +11,8 @@ ColorVal static inline get_max_y(int par) {
 }
 
 ColorVal static inline get_min_i(int par, ColorVal y) {
-    assert(y >= get_min_y());
-    assert(y <= get_max_y());
+    assert(y >= get_min_y(par));
+    assert(y <= get_max_y(par));
 
     if (y<par-1) {
       return 4*par-4-4*y;
@@ -24,8 +24,8 @@ ColorVal static inline get_min_i(int par, ColorVal y) {
 }
 
 ColorVal static inline get_max_i(int par, ColorVal y) {
-    assert(y >= get_min_y());
-    assert(y <= get_max_y());
+    assert(y >= get_min_y(par));
+    assert(y <= get_max_y(par));
 
     if (y<par-1) {
       return 4*par+2+4*y;
@@ -37,10 +37,10 @@ ColorVal static inline get_max_i(int par, ColorVal y) {
 }
 
 ColorVal static inline get_min_q(int par, ColorVal y, ColorVal i) {
-    assert(y >= get_min_y());
-    assert(y <= get_max_y());
-    assert(i >= get_min_i(y));
-    assert(i <= get_max_i(y));
+    assert(y >= get_min_y(par));
+    assert(y <= get_max_y(par));
+    assert(i >= get_min_i(par,y));
+    assert(i <= get_max_i(par,y));
 
     if (y<par-1) {
       return 4*par-2-2*y+(abs(i-4*par+1)/2)*2;
@@ -52,10 +52,10 @@ ColorVal static inline get_min_q(int par, ColorVal y, ColorVal i) {
 }
 
 ColorVal static inline get_max_q(int par, ColorVal y, ColorVal i) {
-    assert(y >= get_min_y());
-    assert(y <= get_max_y());
-    assert(i >= get_min_i(y));
-    assert(i <= get_max_i(y));
+    assert(y >= get_min_y(par));
+    assert(y <= get_max_y(par));
+    assert(i >= get_min_i(par,y));
+    assert(i <= get_max_i(par,y));
 
     if (y<par-1) {
       return 4*par+2*y;
