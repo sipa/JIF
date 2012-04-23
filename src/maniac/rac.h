@@ -151,6 +151,25 @@ public:
     }
 };
 
+
+class RacDummy
+{
+public:
+    void inline write(int num, int denom, bool bit) {
+        assert(num>=0);
+        assert(num<denom);
+        assert(denom>1);
+    }
+
+    void inline write(uint16_t b16, bool bit) {
+        assert(b16>0);
+    }
+
+    void inline write(bool bit) { }
+    void inline flush() { }
+};
+
+
 class RacFileIO
 {
 private:
@@ -169,13 +188,6 @@ public:
     }
 };
 
-class RacDummyIO
-{
-public:
-    void inline write(int byte) {}
-    void inline flush() {}
-};
-
 class RacInput40 : public RacInput<RacConfig40, RacFileIO>
 {
 public:
@@ -186,8 +198,6 @@ class RacOutput40 : public RacOutput<RacConfig40, RacFileIO>
 {
 public:
     RacOutput40(FILE *file) : RacOutput<RacConfig40, RacFileIO>(RacFileIO(file)) { }
-    typedef RacOutput<RacConfig40, RacDummyIO> Dummy;
-    Dummy get_dummy() { return Dummy(RacDummyIO()); }
 };
 
 #endif

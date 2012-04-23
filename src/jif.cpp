@@ -59,7 +59,10 @@ template<typename I> I static median3(I a, I b, I c)
     return b;
 }
 
-typedef MultiscaleBitChance<3,SimpleBitChance> JifBitChance;
+typedef SimpleBitChance                         JifBitChancePass1;
+typedef MultiscaleBitChance<3,SimpleBitChance>  JifBitChancePass2;
+typedef MultiscaleBitChance<6,SimpleBitChance>  JifBitChanceTree;
+typedef SimpleBitChance                         JifBitChanceMeta;
 
 template<typename RAC> void static write_name(RAC& rac, std::string str)
 {
@@ -100,8 +103,7 @@ template<typename Coder> void encode_ffv1_inner(std::vector<Coder*> &coders, con
     for (int r = 0; r < image.rows(); r++) {
         for (int c = 0; c < image.cols(); c++) {
             for (int p = 0; p < image.numPlanes(); p++) {
-                if (image.is_set(p,r,c))
-                {
+                if (image.is_set(p,r,c)) {
                     props_t properties;
                     ColorVal guess = predict(image,p,r,c);
                     properties.push_back(guess);
@@ -114,44 +116,14 @@ template<typename Coder> void encode_ffv1_inner(std::vector<Coder*> &coders, con
     }
 }
 
-template<typename BitChance, typename Rac> void encode_ffv1_pass1(Rac &rac, const Image &image, const ColorRanges *ranges, std::vector<Tree> &forest)
+template<typename Rac, typename Coder> void encode_ffv1_pass(Rac &rac, const Image &image, const ColorRanges *ranges, std::vector<Tree> &forest)
 {
-    typename Rac::Dummy dummyRac = rac.get_dummy();
-    forest.clear();
-
-    std::vector<PropertySymbolCoder<BitChance, typename Rac::Dummy>*> coders;
-    std::vector<propRanges_t> propRangeses;
-    for (int p = 0; p < image.numPlanes(); p++) {
-        propRangeses.push_back(propRanges_t());
-        propRanges_t &propRanges = propRangeses[p];
+    std::vector<Coder*> coders;
+    for (int p = 0; p < ranges->numPlanes(); p++) {
+        propRanges_t propRanges;
         initPropRanges(propRanges, *ranges, p);
         int nBits = ilog2((ranges->max(p) - ranges->min(p))*2-1)+1;
-        coders.push_back(new PropertySymbolCoder<BitChance, typename Rac::Dummy>(dummyRac, propRanges, nBits));
-    }
-
-    encode_ffv1_inner(coders, image, ranges);
-
-    for (int p = 0; p < image.numPlanes(); p++) {
-        MetaPropertySymbolCoder<BitChance, Rac> metacoder(rac, propRangeses[p]);
-        const Tree &tree = coders[p]->get_tree();
-        forest.push_back(tree);
-        metacoder.write_tree(tree);
-//        tree.print(stderr);
-        delete coders[p];
-    }
-}
-
-template<typename BitChance, typename Rac> void encode_ffv1_pass2(Rac &rac, const Image &image, const ColorRanges *ranges, std::vector<Tree> &forest)
-{
-    std::vector<FinalPropertySymbolCoder<BitChance, Rac>*> coders;
-    std::vector<propRanges_t> propRangeses;
-    for (int p = 0; p < image.numPlanes(); p++) {
-        propRangeses.push_back(propRanges_t());
-        propRanges_t &propRanges = propRangeses[p];
-        initPropRanges(propRanges, *ranges, p);
-        int nBits = ilog2((ranges->max(p) - ranges->min(p))*2-1)+1;
-        coders.push_back(new FinalPropertySymbolCoder<BitChance, Rac>(rac, propRanges, nBits, forest[p]));
-        forest[p].print(stderr);
+        coders.push_back(new Coder(rac, propRanges, nBits, forest[p]));
     }
 
     encode_ffv1_inner(coders, image, ranges);
@@ -161,6 +133,15 @@ template<typename BitChance, typename Rac> void encode_ffv1_pass2(Rac &rac, cons
     }
 }
 
+template<typename BitChance, typename Rac> void encode_tree(Rac &rac, const ColorRanges *ranges, const std::vector<Tree> &forest)
+{
+    for (int p = 0; p < ranges->numPlanes(); p++) {
+        propRanges_t propRanges;
+        initPropRanges(propRanges, *ranges, p);
+        MetaPropertySymbolCoder<BitChance, Rac> metacoder(rac, propRanges);
+        metacoder.write_tree(forest[p]);
+    }
+}
 
 bool encode(const char* filename, Image &image)
 {
@@ -169,7 +150,7 @@ bool encode(const char* filename, Image &image)
 
     write_name(rac, "JIF1");
 
-    SimpleSymbolCoder<SimpleBitChance, RacOut> metaCoder(rac, 24);
+    SimpleSymbolCoder<JifBitChanceMeta, RacOut> metaCoder(rac, 24);
     int numPlanes = image.numPlanes();
     metaCoder.write_int(1, 16, numPlanes);
     metaCoder.write_int(1, 65536, image.cols());
@@ -198,11 +179,14 @@ bool encode(const char* filename, Image &image)
     const ColorRanges* ranges = rangesList[1];
 
     // two passes
-    std::vector<Tree> forest;
-    fprintf(stdout,"Encoding pass 1\n");
-    encode_ffv1_pass1<JifBitChance, RacOut>(rac, image, ranges, forest);
-    fprintf(stdout,"Encoding pass 2\n");
-    encode_ffv1_pass2<JifBitChance, RacOut>(rac, image, ranges, forest);
+    std::vector<Tree> forest(ranges->numPlanes(), Tree());
+    RacDummy dummy;
+    fprintf(stdout,"Encoding data (pass 1)\n");
+    encode_ffv1_pass<RacDummy, PropertySymbolCoder<JifBitChancePass1, RacDummy> >(dummy, image, ranges, forest);
+    fprintf(stdout,"Encoding tree\n");
+    encode_tree<JifBitChanceTree, RacOut>(rac, ranges, forest);
+    fprintf(stdout,"Encoding data (pass 2)\n");
+    encode_ffv1_pass<RacOut, FinalPropertySymbolCoder<JifBitChancePass2, RacOut> >(rac, image, ranges, forest);
     fprintf(stdout,"Encoding done\n");
 
     for (int i=transforms.size()-1; i>=0; i--) {
@@ -237,19 +221,24 @@ template<typename Coder> void decode_ffv1_inner(std::vector<Coder*> &coders, Ima
     }
 }
 
-template<typename BitChance, typename Rac> void decode_ffv1(Rac &rac, Image &image, const ColorRanges *ranges)
+template<typename BitChance, typename Rac> void decode_tree(Rac &rac, const ColorRanges *ranges, std::vector<Tree> &forest)
 {
-    std::vector<FinalPropertySymbolCoder<BitChance, RacIn>*> coders;
+    for (int p = 0; p < ranges->numPlanes(); p++) {
+        propRanges_t propRanges;
+        initPropRanges(propRanges, *ranges, p);
+        MetaPropertySymbolCoder<BitChance, Rac> metacoder(rac, propRanges);
+        metacoder.read_tree(forest[p]);
+    }
+}
+
+template<typename Rac, typename Coder> void decode_ffv1_pass(Rac &rac, Image &image, const ColorRanges *ranges, std::vector<Tree> &forest)
+{
+    std::vector<Coder*> coders;
     for (int p = 0; p < image.numPlanes(); p++) {
         propRanges_t propRanges;
         initPropRanges(propRanges, *ranges, p);
         int nBits = ilog2((ranges->max(p) - ranges->min(p))*2-1)+1;
-
-        MetaPropertySymbolCoder<BitChance, Rac> metacoder(rac, propRanges);
-        Tree tree;
-        metacoder.read_tree(tree);
-        tree.print(stderr);
-        coders.push_back(new FinalPropertySymbolCoder<JifBitChance, RacIn>(rac, propRanges, nBits, tree));
+        coders.push_back(new Coder(rac, propRanges, nBits, forest[p]));
     }
 
     decode_ffv1_inner(coders, image, ranges);
@@ -273,7 +262,7 @@ bool decode(const char* filename, Image &image)
         return false;
     }
 
-    SimpleSymbolCoder<SimpleBitChance, RacIn> metaCoder(rac, 24);
+    SimpleSymbolCoder<JifBitChanceMeta, RacIn> metaCoder(rac, 24);
     int numPlanes = metaCoder.read_int(1, 16);
     int width = metaCoder.read_int(1, 65536);
     int height = metaCoder.read_int(1, 65536);
@@ -301,7 +290,12 @@ bool decode(const char* filename, Image &image)
     }
     const ColorRanges* ranges = rangesList[1];
 
-    decode_ffv1<JifBitChance, RacIn>(rac, image, ranges);
+    std::vector<Tree> forest(ranges->numPlanes(), Tree());
+    fprintf(stdout,"Decoding tree\n");
+    decode_tree<JifBitChanceTree, RacIn>(rac, ranges, forest);
+    fprintf(stdout,"Decoding data\n");
+    decode_ffv1_pass<RacIn, FinalPropertySymbolCoder<JifBitChancePass2, RacIn> >(rac, image, ranges, forest);
+    fprintf(stdout,"Decoding done\n");
 
     for (int i=transforms.size()-1; i>=0; i--) {
         transforms[i]->invData(image);

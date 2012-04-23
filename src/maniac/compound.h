@@ -232,7 +232,7 @@ private:
     std::vector<std::pair<int,int> > range;
     unsigned int nb_properties;
     std::vector<FinalCompoundSymbolChances<BitChance> > leaf_node;
-    Tree inner_node;
+    Tree &inner_node;
 
     FinalCompoundSymbolChances<BitChance> inline &find_leaf(std::vector<int> &properties) {
         int pos = 0;
@@ -316,7 +316,7 @@ private:
     const Ranges range;
     unsigned int nb_properties;
     std::vector<CompoundSymbolChances<BitChance> > leaf_node;
-    Tree inner_node;
+    Tree &inner_node;
     std::vector<bool> selection;
 
     CompoundSymbolChances<BitChance> inline &find_leaf(std::vector<int> &properties) {
@@ -381,13 +381,13 @@ private:
     }
 
 public:
-    PropertySymbolCoder(RAC& racIn, std::vector<std::pair<int,int> > &rangeIn, int nBits) :
+    PropertySymbolCoder(RAC& racIn, std::vector<std::pair<int,int> > &rangeIn, int nBits, Tree &treeIn) :
         rac(racIn),
         coder(racIn),
         range(rangeIn),
         nb_properties(range.size()),
         leaf_node(1,CompoundSymbolChances<BitChance>(nb_properties,nBits)),
-        inner_node(),
+        inner_node(treeIn),
         selection(nb_properties,false) {
     }
 
@@ -404,11 +404,6 @@ public:
         CompoundSymbolChances<BitChance> &chances2 = find_leaf(properties);
         coder.write_int(chances2, selection, min, max, val);
     }
-
-    const Tree & get_tree() {
-        return inner_node;
-    }
-
 };
 
 
