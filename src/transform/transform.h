@@ -10,31 +10,20 @@ typedef RacOutput40 RacOut;
 
 class Transform {
 protected:
-    bool virtual meta(Image& image, const ColorRanges *srcRanges, const ColorRanges *&dstRanges) {
-        dstRanges = new DupColorRanges(srcRanges);
-        return true;
-    }
-
-    void virtual load(const ColorRanges *srcRanges, RacIn &rac) {};
-    void virtual process(const ColorRanges *srcRanges, const Image &image) {};
-    void virtual save(const ColorRanges *srcRanges, RacOut &rac) const {};
 
 public:
     virtual ~Transform() {};
 
+    bool virtual init(const ColorRanges *srcRanges) { return true; }
+    bool virtual process(const ColorRanges *srcRanges, const Image &image) { return true; };
+    void virtual load(const ColorRanges *srcRanges, RacIn &rac) {};
+    void virtual save(const ColorRanges *srcRanges, RacOut &rac) const {};
+    const ColorRanges virtual *meta(Image& image, const ColorRanges *srcRanges) { return new DupColorRanges(srcRanges); }
     void virtual data(Image& image) const {}
     void virtual invData(Image& image) const {}
 
-    bool virtual initFromImage(Image &image, RacOut& rac, const ColorRanges *srcRanges, const ColorRanges *&dstRanges) {
-        process(srcRanges, image);
-        save(srcRanges, rac);
-        return meta(image, srcRanges, dstRanges);
-    }
-
-    bool virtual initFromRac(Image &image, RacIn& rac, const ColorRanges *srcRanges, const ColorRanges *&dstRanges) {
-        load(srcRanges, rac);
-        return meta(image, srcRanges, dstRanges);
-    }
+    // On save: init, process, save, meta, data, <processing>
+    // On load: init, load, meta, <processing>, invData (reverse order)
 };
 
 #endif

@@ -25,17 +25,19 @@ class TransformYIQ : public Transform {
 protected:
     int par;
 
-    bool meta(Image& image, const ColorRanges *srcRanges, const ColorRanges *&dstRanges) {
-        if (image.numPlanes() != 3) return false;
+public:
+    bool virtual init(const ColorRanges *srcRanges) {
+        if (srcRanges->numPlanes() != 3) return false;
+        if (srcRanges->min(0) < 0 || srcRanges->min(1) < 0 || srcRanges->min(2) < 0) return false;
         int max = std::max(std::max(srcRanges->max(0), srcRanges->max(1)), srcRanges->max(2));
         par = max/4+1;
-        printf("TransformYIQ::meta: par=%i\n", par);
-
-        dstRanges = new ColorRangesYIQ(image, par);
         return true;
     }
 
-public:
+    const ColorRanges *meta(Image& image, const ColorRanges *srcRanges) {
+        return new ColorRangesYIQ(image, par);
+    }
+
     void data(Image& image) const {
         printf("TransformYIQ::data: par=%i\n", par);
         for (int r=0; r<image.rows(); r++) {

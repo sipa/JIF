@@ -6,8 +6,7 @@
 
 #include "image/image.h"
 #include "image/color_range.h"
-#include "transform/yiq.h"
-#include "transform/bounds.h"
+#include "transform/factory.h"
 
 typedef std::vector<std::pair<int,int> > propRanges_t;
 typedef std::vector<int> props_t;
@@ -143,7 +142,7 @@ template<typename BitChance, typename Rac> void encode_tree(Rac &rac, const Colo
     }
 }
 
-bool encode(const char* filename, Image &image)
+bool encode(const char* filename, Image &image, std::vector<std::string> transDesc)
 {
     FILE *f = fopen(filename,"w");
     RacOut rac(f);
@@ -165,17 +164,20 @@ bool encode(const char* filename, Image &image)
     std::vector<const ColorRanges*> rangesList;
     std::vector<Transform*> transforms;
     rangesList.push_back(getRanges(image));
-    for (int i=0; i<2; i++) {
-        Transform *trans = i==0 ? (Transform*)(new TransformYIQ()) : (Transform*)(new TransformBounds());
-        const ColorRanges* rangesNew;
-        if (!trans->initFromImage(image, rac, rangesList[i], rangesNew)) {
-            fprintf(stderr, "Transform failed! Oh noes!\n");
-            return false;
+    for (unsigned int i=0; i<transDesc.size(); i++) {
+        Transform *trans = create_transform(transDesc[i]);
+        if (!trans->init(rangesList.back()) || !trans->process(rangesList.back(), image)) {
+            fprintf(stderr, "Transform '%s' failed\n", transDesc[i].c_str());
+        } else {
+            printf("Doing transform '%s'\n", transDesc[i].c_str());
+            rac.write(true);
+            write_name(rac, transDesc[i]);
+            trans->save(rangesList.back(), rac);
+            rangesList.push_back(trans->meta(image, rangesList.back()));
+            trans->data(image);
         }
-        trans->data(image);
-        rangesList.push_back(rangesNew);
-        transforms.push_back(trans);
     }
+    rac.write(false);
     const ColorRanges* ranges = rangesList[1];
 
     // two passes
@@ -278,14 +280,20 @@ bool decode(const char* filename, Image &image)
     std::vector<const ColorRanges*> rangesList;
     std::vector<Transform*> transforms;
     rangesList.push_back(getRanges(image));
-    for (int i=0; i<2; i++) {
-        Transform *trans = i==0 ? (Transform*)(new TransformYIQ()) : (Transform*)(new TransformBounds());
-        const ColorRanges* rangesNew;
-        if (!trans->initFromRac(image, rac, rangesList[i], rangesNew)) {
-            fprintf(stderr, "Transform failed! Oh noes!\n");
+    while (rac.read()) {
+        std::string desc = read_name(rac);
+        Transform *trans = create_transform(desc);
+        if (!trans) {
+            fprintf(stderr,"Unknown transformation '%s'\n", desc.c_str());
             return false;
         }
-        rangesList.push_back(rangesNew);
+        if (!trans->init(rangesList.back())) {
+            fprintf(stderr,"Transformation '%s' failed\n", desc.c_str());
+            return false;
+        }
+        printf("Doing transform '%s'\n", desc.c_str());
+        trans->load(rangesList.back(), rac);
+        rangesList.push_back(trans->meta(image, rangesList.back()));
         transforms.push_back(trans);
     }
     const ColorRanges* ranges = rangesList[1];
@@ -317,7 +325,10 @@ int main(int argc, char **argv)
     Image image;
     if (argc == 3) {
         image.load(argv[1]);
-        encode(argv[2], image);
+        std::vector<std::string> desc;
+        desc.push_back("YIQ");
+        desc.push_back("BND");
+        encode(argv[2], image, desc);
     } else if (argc == 4) {
         decode(argv[2], image);
         image.save(argv[3]);
