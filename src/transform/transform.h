@@ -14,6 +14,9 @@ protected:
 public:
     virtual ~Transform() {};
 
+    // On encode: init, process, save, meta, data, <processing>
+    // On decode: init,          load, meta,       <processing>, invData
+
     bool virtual init(const ColorRanges *srcRanges) { return true; }
     bool virtual process(const ColorRanges *srcRanges, const Image &image) { return true; };
     void virtual load(const ColorRanges *srcRanges, RacIn &rac) {};
@@ -22,8 +25,6 @@ public:
     void virtual data(Image& image) const {}
     void virtual invData(Image& image) const {}
 
-    // On save: init, process, save, meta, data, <processing>
-    // On load: init, load, meta, <processing>, invData (reverse order)
 };
 
 #endif
