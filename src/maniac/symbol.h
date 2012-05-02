@@ -78,6 +78,7 @@ public:
     BitChance inline &bitZero()      {
         return chances[0];
     }
+
     BitChance inline &bitSign()      {
         return chances[1];
     }
@@ -118,6 +119,29 @@ public:
             bitMant(i).set(MANT_CHANCES[i]);
         }
     }
+
+    int scale() const {
+        return chances[0].scale();
+    }
+
+#ifdef STATS
+    void dist(std::vector<double> &ret) const {
+        for (int i=0; i<2*bits+1; i++) {
+            chances[i].dist(ret);
+        }
+    }
+
+    void info_symbol(int n) const {
+        indent(n); printf("ZERO:   "); chances[0].info_bitchance();
+        indent(n); printf("SIGN:   "); chances[1].info_bitchance();
+        for (int i=0; i<bits-1; i++) {
+            indent(n); printf("EXP % 2i: ", i); chances[i+2].info_bitchance();
+        }
+        for (int i=0; i<bits; i++) {
+            indent(n); printf("MNT % 2i: ", i); chances[bits+i+1].info_bitchance();
+        }
+    }
+#endif
 
 };
 
@@ -267,19 +291,39 @@ private:
     SymbolChance<BitChance> ctx;
     const Table table;
     RAC &rac;
+#ifdef STATS
+    uint64_t symbols;
+#endif
 
 public:
-    SimpleSymbolCoder(RAC& racIn, int nBits) : ctx(nBits), rac(racIn) {}
+    SimpleSymbolCoder(RAC& racIn, int nBits) : ctx(nBits), rac(racIn) {
+#ifdef STATS
+        symbols = 0;
+#endif
+    }
 
     void write_int(int min, int max, int value) {
         SimpleSymbolBitCoder<BitChance, RAC> bitCoder(table, ctx, rac);
         writer(bitCoder, min, max, value);
+#ifdef STATS
+        symbols++;
+#endif
     }
 
     int read_int(int min, int max) {
         SimpleSymbolBitCoder<BitChance, RAC> bitCoder(table, ctx, rac);
+#ifdef STATS
+        symbols++;
+#endif
         return reader(bitCoder, min, max);
     }
+
+#ifdef STATS
+    void info(int n) const {
+        indent(n); printf("Total integers: %llu\n", (unsigned long long)symbols);
+        ctx.info(n);
+    }
+#endif
 };
 
 #endif

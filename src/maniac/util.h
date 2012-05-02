@@ -5,5 +5,6 @@
 
 extern const uint8_t log2_tab[1024];
 int ilog2(uint32_t l);
+void indent(int n);
 
 #endif

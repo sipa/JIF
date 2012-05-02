@@ -1,4 +1,5 @@
 #include "util.h"
+#include <stdio.h>
 
 // table for integer 2-logs
 const uint8_t log2_tab[1024] = {0,0,1,1,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5,
@@ -37,4 +38,10 @@ int ilog2(uint32_t l)
     }
     p += log2_tab[l];
     return p;
+}
+
+void indent(int n) {
+    for (int i=0; i<n; i++) {
+        printf("  ");
+    }
 }

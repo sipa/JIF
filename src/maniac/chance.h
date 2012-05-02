@@ -1,8 +1,11 @@
 #ifndef _RAC_CHANCE_H_
 #define _RAC_CHANCE_H_ 1
 
+#include <vector>
+#include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 extern const uint16_t log4k[4097];
 extern const int log4k_scale;
@@ -51,11 +54,11 @@ class SimpleBitChanceTable
 public:
     uint16_t next[2][4096];
 
-    void init(int cut = 8, int alpha = 214748365) {
+    void init(int cut, int alpha) {
         build_table(next[0], next[1], 4096, alpha, 4096-cut);
     }
 
-    SimpleBitChanceTable(int cut = 8, int alpha = 214748365) {
+    SimpleBitChanceTable(int cut = 2, int alpha = 0xFFFFFFFF / 19) {
         init(cut, alpha);
     }
 };
@@ -89,6 +92,14 @@ public:
     int scale() const {
         return log4k_scale;
     }
+
+#ifdef STATS
+    void dist(std::vector<double> &dist) const {}
+
+    void info_bitchance() const {
+        printf("\n");
+    }
+#endif
 };
 
 
@@ -106,7 +117,7 @@ public:
     MultiscaleBitChanceTable(int cut = 8) {
         for (int i= 0; i<N; i++) {
             subTable[i].init(cut, MULTISCALE_ALPHAS[i]);
-        }
+          }
     }
 };
 
@@ -116,6 +127,11 @@ protected:
     BitChance chances[N];
     uint32_t quality[N];
     int best;
+#ifdef STATS
+    uint64_t virtSize[N];
+    uint64_t realSize;
+    uint64_t symbols;
+#endif
 
 public:
     typedef MultiscaleBitChanceTable<N,BitChance> Table;
@@ -128,8 +144,15 @@ public:
         for (int i = 0; i<N; i++) {
             chances[i].set(chanceIn);
             quality[i] = 0;
+#ifdef STATS
+            virtSize[i] = 0;
+#endif
         }
         best = 0;
+#ifdef STATS
+        symbols = 0;
+        realSize = 0;
+#endif
     }
 
     uint16_t get() const {
@@ -137,6 +160,10 @@ public:
     }
 
     void put(bool bit, const Table &table) {
+#ifdef STATS
+        int oldBest = best;
+        symbols++;
+#endif
         for (int i=0; i<N; i++) { // for each scale
             uint64_t sbits = 0;
             chances[i].estim(bit, sbits); // number of bits if this scale was used
@@ -144,6 +171,10 @@ public:
             quality[i] = (oqual*4095 + sbits*65537+2048)/4096; // update bits estimate (([0-2**32-1]*4095+[0..2**16-1]*65537+2048)/4096 = [0..2**32-1])
             if (quality[i] < quality[best]) best=i;
             chances[i].put(bit, table.subTable[i]);
+#ifdef STATS
+            virtSize[i] += sbits;
+            if (i == oldBest) realSize += sbits;
+#endif
         }
     }
 
@@ -152,8 +183,27 @@ public:
     }
 
     int scale() const {
-        return BitChance::scale();
+        return chances[0].scale();
     }
+
+#ifdef STATS
+    void dist(std::vector<double> &ret) const {
+        if (ret.size() != N+1)
+            ret = std::vector<double>(N+1, 0.0);
+
+        ret[0] += (double)realSize/scale();
+        for (int i=0; i<N; i++)
+            ret[i+1] += (double)virtSize[i]/scale();
+    }
+
+    void info_bitchance() const {
+        printf("%llu bits: ", (unsigned long long)symbols);
+        printf("%.5f [", (double)symbols*scale()/realSize);
+        for (int i=0; i<N; i++)
+            printf("%.4f ", (double)symbols*scale()/virtSize[i]);
+        printf("]\n");
+    }
+#endif
 };
 
 #endif

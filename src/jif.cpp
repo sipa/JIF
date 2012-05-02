@@ -59,7 +59,7 @@ template<typename I> I static median3(I a, I b, I c)
 }
 
 typedef SimpleBitChance                         JifBitChancePass1;
-typedef MultiscaleBitChance<3,SimpleBitChance>  JifBitChancePass2;
+typedef SimpleBitChance                         JifBitChancePass2;
 typedef MultiscaleBitChance<6,SimpleBitChance>  JifBitChanceTree;
 typedef SimpleBitChance                         JifBitChanceMeta;
 
@@ -128,6 +128,8 @@ template<typename Rac, typename Coder> void encode_ffv1_pass(Rac &rac, const Ima
     encode_ffv1_inner(coders, image, ranges);
 
     for (int p = 0; p < image.numPlanes(); p++) {
+        indent(0); printf("Plane %i\n", p);
+        coders[p]->info(0+1);
         delete coders[p];
     }
 }

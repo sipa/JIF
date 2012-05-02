@@ -1,10 +1,10 @@
 #include <vector>
-
+#include <math.h>
 #include <stdint.h>
 #include "symbol.h"
 
 //#define CONTEXT_TREE_SPLIT_THRESHOLD 5461*1
-#define CONTEXT_TREE_SPLIT_THRESHOLD 5461*8*4
+#define CONTEXT_TREE_SPLIT_THRESHOLD 5461*8*5
 // k bit improvement needed before splitting
 
 typedef  std::vector<std::pair<int,int> > Ranges;
@@ -49,9 +49,46 @@ public:
 template <typename BitChance> class FinalCompoundSymbolChances
 {
 public:
+#ifdef STATS
+    int64_t s_count;
+    double sum;
+    double qsum;
+#endif
     SymbolChance<BitChance> realChances;
 
-    FinalCompoundSymbolChances(int nBits) : realChances(nBits) {}
+    FinalCompoundSymbolChances(int nBits) : realChances(nBits) {
+#ifdef STATS
+        s_count = 0;
+        sum = 0.0;
+        qsum = 0.0;
+#endif
+    }
+
+    const SymbolChance<BitChance> &chances() const { return realChances; }
+
+#ifdef STATS
+    void info(int n) const {
+        std::vector<double> chs;
+        realChances.dist(chs);
+        indent(n); printf("Chances:\n");
+        indent(n+1); printf("Totals ints: %llu\n" , (unsigned long long)s_count);
+        indent(n+1); printf("Total bits/int: %.4f [", chs[0]/s_count);
+        double bestchs = 1.0/0.0;
+        int bestidx = -1;
+        for (unsigned int i=1; i<chs.size(); i++) {
+            printf("%.4f ", chs[i]/s_count);
+            if (chs[i] < bestchs) {
+               bestchs = chs[i];
+               bestidx = i-1;
+            }
+        }
+        printf("]\n");
+//        indent(n+1); printf("Average: %.3f+=%.3f (normal optimal bits/int: %.3f)\n", mu, sigma, nbps);
+        indent(n+1); printf("Loss for const scale: %.1f bits (%.1f cnp)\n", bestchs - chs[0], log(bestchs/chs[0])*100.0);
+        indent(n+1); printf("Best scale: %i\n", bestidx);
+        realChances.info_symbol(n+1);
+    }
+#endif
 };
 
 // leaf nodes during tree construction phase
@@ -82,6 +119,7 @@ public:
         count(0),
         best_property(-1)
     { }
+
 };
 
 
@@ -196,6 +234,11 @@ public:
     }
 
     void write_int(FinalCompoundSymbolChances<BitChance>& chancesIn, int min, int max, int val) {
+#ifdef STATS
+        chancesIn.sum += (double)val;
+        chancesIn.qsum += (double)val*val;
+        chancesIn.s_count++;
+#endif
         FinalCompoundSymbolBitCoder<BitChance, RAC> bitCoder(table, rac, chancesIn);
         writer(bitCoder, min, max, val);
     }
@@ -302,6 +345,15 @@ public:
         coder.write_int(chances, min, max, val);
     }
 
+#ifdef STATS
+    void info(int n) const {
+        indent(n); printf("Tree:\n");
+        for (unsigned int i=0; i<leaf_node.size(); i++) {
+            indent(n); printf("Leaf %i\n", i);
+            leaf_node[i].info(n+1);
+        }
+    }
+#endif
 };
 
 
@@ -318,6 +370,9 @@ private:
     std::vector<CompoundSymbolChances<BitChance> > leaf_node;
     Tree &inner_node;
     std::vector<bool> selection;
+#ifdef STATS
+    uint64_t symbols;
+#endif
 
     CompoundSymbolChances<BitChance> inline &find_leaf(std::vector<int> &properties) {
         int pos = 0;
@@ -389,9 +444,15 @@ public:
         leaf_node(1,CompoundSymbolChances<BitChance>(nb_properties,nBits)),
         inner_node(treeIn),
         selection(nb_properties,false) {
+#ifdef STATS
+            symbols = 0;
+#endif
     }
 
     int read_int(std::vector<int> &properties, int min, int max) {
+#ifdef STATS
+        symbols++;
+#endif
         CompoundSymbolChances<BitChance> &chances = find_leaf(properties);
         set_selection_and_update_property_sums(properties,chances);
         CompoundSymbolChances<BitChance> &chances2 = find_leaf(properties);
@@ -399,11 +460,19 @@ public:
     }
 
     void write_int(std::vector<int> &properties, int min, int max, int val) {
+#ifdef STATS
+        symbols++;
+#endif
         CompoundSymbolChances<BitChance> &chances = find_leaf(properties);
         set_selection_and_update_property_sums(properties,chances);
         CompoundSymbolChances<BitChance> &chances2 = find_leaf(properties);
         coder.write_int(chances2, selection, min, max, val);
     }
+    
+#ifdef STATS
+    void info(int n) const {
+    }
+#endif
 };
 
 
