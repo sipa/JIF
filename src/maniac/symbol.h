@@ -61,7 +61,7 @@ typedef enum {
     BIT_MANT
 } SymbolChanceBitType;
 
-static const char *SymbolChanceBitName[] = {"zero", "sign", "expo", "mant"};
+//static const char *SymbolChanceBitName[] = {"zero", "sign", "expo", "mant"};
 
 static const uint16_t EXP_CHANCES[] = {3200, 2800, 2600, 2400, 2000, 1500, 800, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300};
 static const uint16_t MANT_CHANCES[] = {1800, 1800, 1800, 1700, 1600, 1200, 1000, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800};

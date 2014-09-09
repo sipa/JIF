@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <assert.h>
+#include <stdio.h>
 
 typedef int ColorVal;
 
@@ -73,12 +74,14 @@ public:
         return ((r % subsample[p].first) == 0 && (c % subsample[p].second) == 0);
     }
 
+    // access pixel by coordinate
     ColorVal operator()(int p, int r, int c) const {
         return planes[p](r / subsample[p].first,c / subsample[p].second);
     }
     ColorVal& operator()(int p, int r, int c) {
         return planes[p](r / subsample[p].first,c / subsample[p].second);
     }
+
 
     int numPlanes() const {
         return planes.size();
@@ -98,6 +101,41 @@ public:
 
     int cols() const {
         return width;
+    }
+
+    // access pixel by zoomlevel coordinate
+    int zoom_rowpixelsize(int zoomlevel) const {
+        return 1<<((zoomlevel+1)/2);
+    }
+    int zoom_colpixelsize(int zoomlevel) const {
+        return 1<<((zoomlevel)/2);
+    }
+
+    int rows(int zoomlevel) const {
+        return 1+(rows()-1)/zoom_rowpixelsize(zoomlevel);
+    }
+    int cols(int zoomlevel) const {
+        return 1+(cols()-1)/zoom_colpixelsize(zoomlevel);
+    }
+    int zooms() const {
+        int z = 0;
+        while (zoom_rowpixelsize(z) < rows() || zoom_colpixelsize(z) < cols()) z++;
+        return z;
+    }
+    ColorVal operator()(int p, int z, int rz, int cz) const {
+//        if (p==0) fprintf(stdout,"Reading pixel at zoomlevel %i, position %i,%i, actual position %i,%i\n",z,rz,cz,rz*zoom_rowpixelsize(z),cz*zoom_colpixelsize(z));
+//        return operator()(p,rz*zoom_rowpixelsize(z),cz*zoom_colpixelsize(z));
+        int r = rz*zoom_rowpixelsize(z);
+        int c = cz*zoom_colpixelsize(z);
+//        if (p==0 && r>= 0 && c>=0 && r<width &&c<height) fprintf(stdout,"Reading pixel at zoomlevel %i, position %i,%i, actual position %i,%i\n",z,rz,cz,rz*zoom_rowpixelsize(z),cz*zoom_colpixelsize(z));
+        return planes[p](r,c);
+    }
+    ColorVal& operator()(int p, int z, int rz, int cz) {
+//        return operator()(p,rz*zoom_rowpixelsize(z),cz*zoom_colpixelsize(z));
+        int r = rz*zoom_rowpixelsize(z);
+        int c = cz*zoom_colpixelsize(z);
+//        if (p==0 && r>= 0 && c>=0 && r<width &&c<height) fprintf(stdout,"Writing to pixel at zoomlevel %i, position %i,%i, actual position %i,%i\n",z,rz,cz,rz*zoom_rowpixelsize(z),cz*zoom_colpixelsize(z));
+        return planes[p](r,c);
     }
 
     int subSampleR(int p) const {
