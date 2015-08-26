@@ -4,15 +4,27 @@
 #include <vector>
 #include <assert.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <valarray>
+#include "../jif_config.h"
+#include "crc32k.h"
 
-typedef int ColorVal;
+typedef int16_t ColorVal;  // used in computations
+//typedef uint8_t ColorVal_intern; // used in representations
+typedef int16_t ColorVal_intern; // used in representations
+
+#ifdef SMOOTHZOOM
+// make sure this is a bit position that fits in ColorVal and that is not used by actual pixels
+#define PARITYBIT 2048
+#define PARITYMASK 2047
+#endif
 
 class Plane
 {
 public:
     int subwidth, subheight;
     ColorVal min, max;
-    std::vector<ColorVal> data;
+    std::valarray<ColorVal_intern> data;
 
     Plane(int subwidth, int subheight, ColorVal min, ColorVal max) {
         init(subwidth, subheight, min, max);
@@ -24,13 +36,13 @@ public:
 
     void init(int subwidth, int subheight, ColorVal min, ColorVal max);
 
-    ColorVal &operator()(int subr, int subc) {
+    ColorVal_intern &operator()(int subr, int subc) {
         assert(!(subr >= subheight || subr < 0 || subc >= subwidth || subc < 0));
         return data[subr*subwidth + subc];
     }
 
     ColorVal operator()(int subr, int subc) const {
-        if (subr >= subheight || subr < 0 || subc >= subwidth || subc < 0) return 0;
+//        if (subr >= subheight || subr < 0 || subc >= subwidth || subc < 0) {printf("OUT OF RANGE!\n"); return 0;}
         return data[subr*subwidth + subc];
     }
 };
@@ -42,14 +54,14 @@ protected:
     std::vector<Plane> planes;
     std::vector<std::pair<int,int> > subsample; // first=rows, seconds=cols
 
+
+public:
     Plane &operator()(int plane) {
         return planes[plane];
     }
     const Plane &operator()(int plane) const {
         return planes[plane];
     }
-
-public:
 
     Image(int width, int height, ColorVal min, ColorVal max, int planes) {
         init(width, height, min, max, planes);
@@ -67,6 +79,11 @@ public:
 
     void add_plane(ColorVal min, ColorVal max, int subSampleR = 1, int subSampleC = 1);
 
+    void drop_planes(int newsize) {
+        planes.resize(newsize);
+        subsample.resize(newsize);
+    }
+
     bool load(const char *name);
     bool save(const char *name) const;
 
@@ -76,10 +93,12 @@ public:
 
     // access pixel by coordinate
     ColorVal operator()(int p, int r, int c) const {
-        return planes[p](r / subsample[p].first,c / subsample[p].second);
+        return planes[p](r,c);
+//        return planes[p](r / subsample[p].first,c / subsample[p].second);
     }
-    ColorVal& operator()(int p, int r, int c) {
-        return planes[p](r / subsample[p].first,c / subsample[p].second);
+    ColorVal_intern& operator()(int p, int r, int c) {
+        return planes[p](r,c);
+//        return planes[p](r / subsample[p].first,c / subsample[p].second);
     }
 
 
@@ -130,7 +149,7 @@ public:
 //        if (p==0 && r>= 0 && c>=0 && r<width &&c<height) fprintf(stdout,"Reading pixel at zoomlevel %i, position %i,%i, actual position %i,%i\n",z,rz,cz,rz*zoom_rowpixelsize(z),cz*zoom_colpixelsize(z));
         return planes[p](r,c);
     }
-    ColorVal& operator()(int p, int z, int rz, int cz) {
+    ColorVal_intern& operator()(int p, int z, int rz, int cz) {
 //        return operator()(p,rz*zoom_rowpixelsize(z),cz*zoom_colpixelsize(z));
         int r = rz*zoom_rowpixelsize(z);
         int c = cz*zoom_colpixelsize(z);
@@ -145,6 +164,26 @@ public:
     int subSampleC(int p) const {
         return subsample[p].second;
     }
+    void permute_planes(const std::vector<int> &p) {
+        std::vector<Plane> oldplanes = planes;
+        for (unsigned int i=0; i<p.size(); i++)
+                planes[i] = oldplanes[p[i]];
+    }
+    uint32_t checksum() {
+          uint_fast32_t crc=0;
+          crc32k_transform(crc,width & 255);
+          crc32k_transform(crc,width / 256);
+          crc32k_transform(crc,height & 255);
+          crc32k_transform(crc,height / 256);
+          for (Plane p : planes) {
+            for (ColorVal d : p.data) {
+                crc32k_transform(crc,d & 255);
+                crc32k_transform(crc,d / 256);
+            }
+          }
+          return (~crc & 0xFFFFFFFF);
+    }
+
 };
 
 #endif

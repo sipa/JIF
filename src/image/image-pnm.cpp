@@ -19,9 +19,12 @@ bool image_load_pnm(const char *filename, Image& image)
     unsigned int width=0,height=0;
     unsigned int maxval=0;
     t = fgets(buf, PPMREADBUFLEN, fp);
-    if ( (t == NULL) && ( strncmp(buf, "P6\n", 3) == 0 ) ) {
-
-        fprintf(stderr,"PPM file is not of type P6, cannot read other types.\n");
+    int type=0;
+    if ( (!strncmp(buf, "P4\n", 3)) ) type=4;
+    if ( (!strncmp(buf, "P5\n", 3)) ) type=5;
+    if ( (!strncmp(buf, "P6\n", 3)) ) type=6;
+    if (type==0) {
+        fprintf(stderr,"PPM file is not of type P4, P5 or P6, cannot read other types.\n");
         fclose(fp);
         return false;
     }
@@ -36,6 +39,7 @@ bool image_load_pnm(const char *filename, Image& image)
         return false;
     }
 
+    if (type>4) {
     char bla;
     r = fscanf(fp, "%u%c", &maxval, &bla);
     if ( (r < 2) || maxval<1 || maxval>255 ) {
@@ -43,15 +47,25 @@ bool image_load_pnm(const char *filename, Image& image)
         fclose(fp);
         return 2;
     }
-
-    image.init(width, height, 0, maxval, 3);
-
-    for (unsigned int y=0; y<height; y++) {
+    } else maxval=1;
+    unsigned int nbplanes=(type==6?3:1);
+    image.init(width, height, 0, maxval, nbplanes);
+    if (type==4) {
+      char byte=0;
+      for (unsigned int y=0; y<height; y++) {
         for (unsigned int x=0; x<width; x++) {
-            for (unsigned int c=0; c<3; c++) {
+                if (x%8 == 0) byte = fgetc(fp);
+                image(0,y,x) = (byte & (128>>(x%8)) ? 0 : 1);
+        }
+      }
+    } else {
+      for (unsigned int y=0; y<height; y++) {
+        for (unsigned int x=0; x<width; x++) {
+            for (unsigned int c=0; c<nbplanes; c++) {
                 image(c,y,x) = fgetc(fp);
             }
         }
+      }
     }
     fclose(fp);
     return true;
@@ -64,7 +78,8 @@ bool image_save_pnm(const char *filename, const Image& image)
         return false;
     }
 
-    if (image.numPlanes() == 3) {
+    if (image.numPlanes() >= 3) {
+        if (image.numPlanes() == 4) printf("WARNING: image has alpha channel, saving to flat PPM! Save to .PNG if you want to keep the alpha channel!\n");
         ColorVal max = std::max(std::max(image.max(0), image.max(1)), image.max(2));
         ColorVal min = std::min(std::min(image.min(0), image.min(1)), image.min(2));
 

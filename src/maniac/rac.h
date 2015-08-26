@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <assert.h>
 
+
 /* RAC configuration for 40-bit RAC */
 class RacConfig40
 {
@@ -13,6 +14,17 @@ public:
     static const int MAX_RANGE_BITS = 40;
     static const int MIN_RANGE_BITS = (MAX_RANGE_BITS-8);
     static const data_t MIN_RANGE = (1ULL << (data_t)(MIN_RANGE_BITS));
+    static const data_t BASE_RANGE = (1ULL << MAX_RANGE_BITS);
+};
+
+/* RAC configuration for 24-bit RAC */
+class RacConfig24
+{
+public:
+    typedef uint32_t data_t;
+    static const data_t MAX_RANGE_BITS = 24;
+    static const data_t MIN_RANGE_BITS = (MAX_RANGE_BITS-8);
+    static const data_t MIN_RANGE = (1ULL << MIN_RANGE_BITS);
     static const data_t BASE_RANGE = (1ULL << MAX_RANGE_BITS);
 };
 
@@ -61,12 +73,12 @@ public:
         assert(num>=0);
         assert(num<denom);
         assert(denom>0);
-        return get((range * num + denom / 2) / denom);
+        return get(((uint64_t)range * num + denom / 2) / denom);
     }
 
     bool inline read(uint16_t b16) {
         assert(b16>0);
-        return get((range * b16 + 0x8000) >> 16);
+        return get(((uint64_t)range * b16 + 0x8000) >> 16);
     }
 
     bool inline read() {
@@ -129,12 +141,12 @@ public:
         assert(num>=0);
         assert(num<denom);
         assert(denom>1);
-        put((range * num + denom / 2) / denom, bit);
+        put(((uint64_t)range * num + denom / 2) / denom, bit);
     }
 
     void inline write(uint16_t b16, bool bit) {
         assert(b16>0);
-        put((range * b16 + 0x8000) >> 16, bit);
+        put(((uint64_t)range * b16 + 0x8000) >> 16, bit);
     }
 
     void inline write(bool bit) {
@@ -198,6 +210,18 @@ class RacOutput40 : public RacOutput<RacConfig40, RacFileIO>
 {
 public:
     RacOutput40(FILE *file) : RacOutput<RacConfig40, RacFileIO>(RacFileIO(file)) { }
+};
+
+class RacInput24 : public RacInput<RacConfig24, RacFileIO>
+{
+public:
+    RacInput24(FILE *file) : RacInput<RacConfig24, RacFileIO>(RacFileIO(file)) { }
+};
+
+class RacOutput24 : public RacOutput<RacConfig24, RacFileIO>
+{
+public:
+    RacOutput24(FILE *file) : RacOutput<RacConfig24, RacFileIO>(RacFileIO(file)) { }
 };
 
 #endif

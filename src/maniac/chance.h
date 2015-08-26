@@ -126,7 +126,7 @@ template<int N, typename BitChance> class MultiscaleBitChance
 protected:
     BitChance chances[N];
     uint32_t quality[N];
-    int best;
+    uint8_t best;
 #ifdef STATS
     uint64_t virtSize[N];
     uint64_t realSize;
@@ -168,14 +168,20 @@ public:
             uint64_t sbits = 0;
             chances[i].estim(bit, sbits); // number of bits if this scale was used
             uint64_t oqual=quality[i]; // previous estimate of bits used for this scale
-            quality[i] = (oqual*4095 + sbits*65537+2048)/4096; // update bits estimate (([0-2**32-1]*4095+[0..2**16-1]*65537+2048)/4096 = [0..2**32-1])
-            if (quality[i] < quality[best]) best=i;
+// update quality estimate -- gradually forget the past
+//            quality[i] = (oqual*4095 + sbits*65537+2048)/4096; // update bits estimate (([0-2**32-1]*4095+[0..2**16-1]*65537+2048)/4096 = [0..2**32-1])
+//            quality[i] = (oqual*2047 + sbits*32769+1024)/2048;
+//            quality[i] = (oqual*511 + sbits*8193 + 256)>>9;
+            quality[i] = (oqual*255 + sbits*4097 + 128)>>8;
+//            quality[i] = (oqual*127 + sbits*2049 + 64)>>7;
+//            if (quality[i] < quality[best]) best=i;
             chances[i].put(bit, table.subTable[i]);
 #ifdef STATS
             virtSize[i] += sbits;
             if (i == oldBest) realSize += sbits;
 #endif
         }
+        for (int i=0; i<N; i++) if (quality[i] < quality[best]) best=i;
     }
 
     void estim(bool bit, uint64_t &total) const {
