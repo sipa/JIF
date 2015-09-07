@@ -12,3 +12,4 @@ Moreover, JiF supports a form of progressive interlacing (essentially a generali
 which means that any prefix (e.g. partial download) of a compressed file can be used as a reasonable
 lossy encoding of the entire image.
 
+JiF is now called FLIF and it moved over here: https://github.com/jonsneyers/FLIF
